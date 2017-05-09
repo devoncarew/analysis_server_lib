@@ -5,6 +5,7 @@
 .packages
 .project
 .pub/
+.idea/
 build/
 **/packages/
 
