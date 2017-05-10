@@ -5,7 +5,7 @@
 // This is a generated file.
 
 /// A library to access the analysis server API.
-library analysis_server;
+library analysis_server_lib;
 
 import 'dart:async';
 import 'dart:convert';

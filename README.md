@@ -19,7 +19,7 @@ process and communicate with it over a JSON protocol. The protocol is specified
 Here's a simple example of starting and communicating with the server:
 
 ```dart
-import 'package:analysis_server_lib/analysis_server.dart';
+import 'package:analysis_server_lib/analysis_server_lib.dart';
 
 main() async {
   AnalysisServer server = await AnalysisServer.create();
