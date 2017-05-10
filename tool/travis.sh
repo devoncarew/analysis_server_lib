@@ -14,7 +14,7 @@ dart -c tool/generate_analysis.dart
 dartanalyzer --fatal-warnings \
   tool/generate_analysis.dart \
   tool/src/analysis_tester.dart \
-  lib/analysis_server.dart \
+  lib/analysis_server_lib.dart \
   test/analysis_server_test.dart
 
 # Run the tests.
