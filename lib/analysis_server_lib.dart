@@ -1307,7 +1307,8 @@ class EditDomain extends Domain {
       'validateOnly': validateOnly
     };
     if (options != null) m['options'] = options;
-    return _call('edit.getRefactoring', m).then(RefactoringResult.parse);
+    return _call('edit.getRefactoring', m)
+        .then((m) => RefactoringResult.parse(kind, m));
   }
 
   /// Get the changes required to convert the partial statement at the given
@@ -1411,7 +1412,7 @@ class FixesResult {
 }
 
 class RefactoringResult {
-  static RefactoringResult parse(Map m) => new RefactoringResult(
+  static RefactoringResult parse(String kind, Map m) => new RefactoringResult(
       m['initialProblems'] == null
           ? null
           : new List.from(
@@ -1424,7 +1425,7 @@ class RefactoringResult {
           ? null
           : new List.from(
               m['finalProblems'].map((obj) => RefactoringProblem.parse(obj))),
-      feedback: RefactoringFeedback.parse(m['feedback']),
+      feedback: RefactoringFeedback.parse(kind, m['feedback']),
       change: SourceChange.parse(m['change']),
       potentialEdits: m['potentialEdits'] == null
           ? null
@@ -3045,46 +3046,170 @@ class RenameRefactoringOptions extends RefactoringOptions {
   Map toMap() => _stripNullValues({'newName': newName});
 }
 
-// EXTRACT_LOCAL_VARIABLE:
-//   @optional coveringExpressionOffsets → List<int>
-//   @optional coveringExpressionLengths → List<int>
-//   names → List<String>
-//   offsets → List<int>
-//   lengths → List<int>
+abstract class RefactoringFeedback {
+  static RefactoringFeedback parse(String kind, Map m) {
+    if (m == null) return null;
 
-// EXTRACT_METHOD:
-//   offset → int
-//   length → int
-//   returnType → String
-//   names → List<String>
-//   canCreateGetter → bool
-//   parameters → List<RefactoringMethodParameter>
-//   offsets → List<int>
-//   lengths → List<int>
+    switch (kind) {
+      case Refactorings.EXTRACT_LOCAL_VARIABLE:
+        return ExtractLocalVariableFeedback.parse(m);
+      case Refactorings.EXTRACT_METHOD:
+        return ExtractMethodFeedback.parse(m);
+      case Refactorings.INLINE_LOCAL_VARIABLE:
+        return InlineLocalVariableFeedback.parse(m);
+      case Refactorings.INLINE_METHOD:
+        return InlineMethodFeedback.parse(m);
+      case Refactorings.RENAME:
+        return RenameFeedback.parse(m);
+    }
 
-// INLINE_LOCAL_VARIABLE:
-//   name → String
-//   occurrences → int
-
-// INLINE_METHOD:
-//   @optional className → String
-//   methodName → String
-//   isDeclaration → bool
-
-// RENAME:
-//   offset → int
-//   length → int
-//   elementKindName → String
-//   oldName → String
-
-class RefactoringFeedback {
-  static RefactoringFeedback parse(Map m) {
-    return m == null ? null : new RefactoringFeedback(m);
+    return null;
   }
+}
 
-  final Map _m;
+/// Feedback class for the `EXTRACT_LOCAL_VARIABLE` refactoring.
+class ExtractLocalVariableFeedback extends RefactoringFeedback {
+  static ExtractLocalVariableFeedback parse(Map m) =>
+      new ExtractLocalVariableFeedback(
+          m['names'] == null ? null : new List.from(m['names']),
+          m['offsets'] == null ? null : new List.from(m['offsets']),
+          m['lengths'] == null ? null : new List.from(m['lengths']),
+          coveringExpressionOffsets: m['coveringExpressionOffsets'] == null
+              ? null
+              : new List.from(m['coveringExpressionOffsets']),
+          coveringExpressionLengths: m['coveringExpressionLengths'] == null
+              ? null
+              : new List.from(m['coveringExpressionLengths']));
 
-  RefactoringFeedback(this._m);
+  /// The proposed names for the local variable.
+  final List<String> names;
 
-  operator [](String key) => _m[key];
+  /// The offsets of the expressions that would be replaced by a reference to
+  /// the variable.
+  final List<int> offsets;
+
+  /// The lengths of the expressions that would be replaced by a reference to
+  /// the variable. The lengths correspond to the offsets. In other words, for a
+  /// given expression, if the offset of that expression is offsets[i], then the
+  /// length of that expression is lengths[i].
+  final List<int> lengths;
+
+  /// The offsets of the expressions that cover the specified selection, from
+  /// the down most to the up most.
+  @optional
+  final List<int> coveringExpressionOffsets;
+
+  /// The lengths of the expressions that cover the specified selection, from
+  /// the down most to the up most.
+  @optional
+  final List<int> coveringExpressionLengths;
+
+  ExtractLocalVariableFeedback(this.names, this.offsets, this.lengths,
+      {this.coveringExpressionOffsets, this.coveringExpressionLengths});
+}
+
+/// Feedback class for the `EXTRACT_METHOD` refactoring.
+class ExtractMethodFeedback extends RefactoringFeedback {
+  static ExtractMethodFeedback parse(Map m) => new ExtractMethodFeedback(
+      m['offset'],
+      m['length'],
+      m['returnType'],
+      m['names'] == null ? null : new List.from(m['names']),
+      m['canCreateGetter'],
+      m['parameters'] == null
+          ? null
+          : new List.from(m['parameters']
+              .map((obj) => RefactoringMethodParameter.parse(obj))),
+      m['offsets'] == null ? null : new List.from(m['offsets']),
+      m['lengths'] == null ? null : new List.from(m['lengths']));
+
+  /// The offset to the beginning of the expression or statements that will be
+  /// extracted.
+  final int offset;
+
+  /// The length of the expression or statements that will be extracted.
+  final int length;
+
+  /// The proposed return type for the method. If the returned element does not
+  /// have a declared return type, this field will contain an empty string.
+  final String returnType;
+
+  /// The proposed names for the method.
+  final List<String> names;
+
+  /// True if a getter could be created rather than a method.
+  final bool canCreateGetter;
+
+  /// The proposed parameters for the method.
+  final List<RefactoringMethodParameter> parameters;
+
+  /// The offsets of the expressions or statements that would be replaced by an
+  /// invocation of the method.
+  final List<int> offsets;
+
+  /// The lengths of the expressions or statements that would be replaced by an
+  /// invocation of the method. The lengths correspond to the offsets. In other
+  /// words, for a given expression (or block of statements), if the offset of
+  /// that expression is offsets[i], then the length of that expression is
+  /// lengths[i].
+  final List<int> lengths;
+
+  ExtractMethodFeedback(this.offset, this.length, this.returnType, this.names,
+      this.canCreateGetter, this.parameters, this.offsets, this.lengths);
+}
+
+/// Feedback class for the `INLINE_LOCAL_VARIABLE` refactoring.
+class InlineLocalVariableFeedback extends RefactoringFeedback {
+  static InlineLocalVariableFeedback parse(Map m) =>
+      new InlineLocalVariableFeedback(m['name'], m['occurrences']);
+
+  /// The name of the variable being inlined.
+  final String name;
+
+  /// The number of times the variable occurs.
+  final int occurrences;
+
+  InlineLocalVariableFeedback(this.name, this.occurrences);
+}
+
+/// Feedback class for the `INLINE_METHOD` refactoring.
+class InlineMethodFeedback extends RefactoringFeedback {
+  static InlineMethodFeedback parse(Map m) =>
+      new InlineMethodFeedback(m['methodName'], m['isDeclaration'],
+          className: m['className']);
+
+  /// The name of the method (or function) being inlined.
+  final String methodName;
+
+  /// True if the declaration of the method is selected. So all references
+  /// should be inlined.
+  final bool isDeclaration;
+
+  /// The name of the class enclosing the method being inlined. If not a class
+  /// member is being inlined, this field will be absent.
+  @optional
+  final String className;
+
+  InlineMethodFeedback(this.methodName, this.isDeclaration, {this.className});
+}
+
+/// Feedback class for the `RENAME` refactoring.
+class RenameFeedback extends RefactoringFeedback {
+  static RenameFeedback parse(Map m) => new RenameFeedback(
+      m['offset'], m['length'], m['elementKindName'], m['oldName']);
+
+  /// The offset to the beginning of the name selected to be renamed.
+  final int offset;
+
+  /// The length of the name selected to be renamed.
+  final int length;
+
+  /// The human-readable description of the kind of element being renamed (such
+  /// as "class" or "function type alias").
+  final String elementKindName;
+
+  /// The old name of the element before the refactoring.
+  final String oldName;
+
+  RenameFeedback(this.offset, this.length, this.elementKindName, this.oldName);
 }

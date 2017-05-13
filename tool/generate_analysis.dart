@@ -144,27 +144,73 @@ class Api {
 
     // Refactoring feedback.
     gen.writeln();
+
+    gen.writeStatement('abstract class RefactoringFeedback {');
+    gen.writeStatement(
+        'static RefactoringFeedback parse(String kind, Map m) {');
+    gen.writeStatement('if (m == null) return null;');
+    gen.writeln();
+    gen.writeStatement('switch (kind) {');
     refactorings.forEach((Refactoring refactor) {
       if (refactor.feedbackFields.isEmpty) return;
-
-      gen.writeln("// ${refactor.kind}:");
-      for (Field field in refactor.feedbackFields) {
-        gen.writeln(
-            "//   ${field.optional ? '@optional ' : ''}${field.name} → ${field.type}");
-      }
-      gen.writeln();
+      gen.writeStatement("case Refactorings.${refactor.kind}: "
+          "return ${refactor.className}Feedback.parse(m);");
     });
-    gen.writeStatement('class RefactoringFeedback {');
-    gen.writeStatement('static RefactoringFeedback parse(Map m) {');
-    gen.writeStatement('return m == null ? null : new RefactoringFeedback(m);');
     gen.writeStatement('}');
     gen.writeln();
-    gen.writeStatement('final Map _m;');
-    gen.writeln();
-    gen.writeStatement('RefactoringFeedback(this._m);');
-    gen.writeln();
-    gen.writeStatement('operator[](String key) => _m[key];');
+    gen.writeStatement('return null;');
     gen.writeStatement('}');
+    gen.writeStatement('}');
+
+    // Refactoring feedback classes.
+    for (Refactoring refactor in refactorings) {
+      if (refactor.feedbackFields.isEmpty) continue;
+
+      List<Field> fields = refactor.feedbackFields;
+      String name = '${refactor.className}Feedback';
+
+      gen.writeln();
+      gen.writeDocs('Feedback class for the `${refactor.kind}` refactoring.');
+      gen.writeStatement('class ${name} extends RefactoringFeedback {');
+      gen.write('static ${name} parse(Map m) => ');
+      gen.write('new ${name}(');
+      gen.write(fields.map((Field field) {
+        String val = "m['${field.name}']";
+        if (field.type.isMap) {
+          val = 'new Map.from($val)';
+        }
+
+        if (field.optional) {
+          return "${field.name}: ${field.type.jsonConvert(val)}";
+        } else {
+          return field.type.jsonConvert(val);
+        }
+      }).join(', '));
+      gen.writeln(');');
+      gen.writeln();
+      fields.forEach((field) {
+        if (field.deprecated) {
+          gen.write('@deprecated ');
+        } else {
+          gen.writeDocs(field.docs);
+        }
+        if (field.optional) gen.write('@optional ');
+        gen.writeln('final ${field.type} ${field.name};');
+      });
+      gen.writeln();
+      gen.write('${name}(');
+      gen.write(fields.map((field) {
+        StringBuffer buf = new StringBuffer();
+        if (field.optional && fields.firstWhere((a) => a.optional) == field)
+          buf.write('{');
+        buf.write('this.${field.name}');
+        if (field.optional && fields.lastWhere((a) => a.optional) == field)
+          buf.write('}');
+        return buf.toString();
+      }).join(', '));
+      gen.writeln(');');
+      gen.writeln('}');
+    }
   }
 
   String toString() => domains.toString();
@@ -216,12 +262,17 @@ class Domain {
     notifications.forEach(
         (Notification notification) => notification.generateClass(gen));
 
+    // Result classes
     for (String name in resultClasses.keys) {
       List<Field> fields = resultClasses[name];
 
       gen.writeln();
       gen.writeStatement('class ${name} {');
-      gen.write('static ${name} parse(Map m) => ');
+      if (name == 'RefactoringResult') {
+        gen.write('static ${name} parse(String kind, Map m) => ');
+      } else {
+        gen.write('static ${name} parse(Map m) => ');
+      }
       gen.write('new ${name}(');
       gen.write(fields.map((Field field) {
         String val = "m['${field.name}']";
@@ -312,9 +363,11 @@ class Request {
     }
     if (experimental) gen.writeln('@experimental');
 
+    String qName = '${domain.name}.${method}';
+
     if (results.isEmpty) {
       if (args.isEmpty) {
-        gen.writeln("Future ${method}() => _call('${domain.name}.${method}');");
+        gen.writeln("Future ${method}() => _call('$qName');");
         return;
       }
 
@@ -326,15 +379,13 @@ class Request {
           type = 'Map<String, ContentOverlayType>';
         }
         gen.write("Future ${method}(${type} ${arg.name}) => ");
-        gen.writeln(
-            "_call('${domain.name}.${method}', {'${arg.name}': ${arg.name}});");
+        gen.writeln("_call('$qName', {'${arg.name}': ${arg.name}});");
         return;
       }
     }
 
     if (args.isEmpty) {
-      gen.writeln(
-          "Future<${resultName}> ${method}() => _call('${domain.name}.${method}').then("
+      gen.writeln("Future<${resultName}> ${method}() => _call('$qName').then("
           "${resultName}.parse);");
       return;
     }
@@ -355,7 +406,7 @@ class Request {
     }).join(', '));
     gen.writeStatement(') {');
     if (args.isEmpty) {
-      gen.write("return _call('${domain.name}.${method}')");
+      gen.write("return _call('$qName')");
       if (results.isNotEmpty) {
         gen.write(".then(${resultName}.parse)");
       }
@@ -370,9 +421,13 @@ class Request {
         gen.writeStatement(
             "if (${arg.name} != null) m['${arg.name}'] = ${arg.name};");
       }
-      gen.write("return _call('${domain.name}.${method}', m)");
+      gen.write("return _call('$qName', m)");
       if (results.isNotEmpty) {
-        gen.write(".then(${resultName}.parse)");
+        if (qName == 'edit.getRefactoring') {
+          gen.write(".then((m) => ${resultName}.parse(kind, m))");
+        } else {
+          gen.write(".then(${resultName}.parse)");
+        }
       }
       gen.writeln(';');
     }
@@ -520,6 +575,7 @@ class Refactoring {
       feedbackFields = new List.from(feedback
           .getElementsByTagName('field')
           .map((field) => new Field(field)));
+      feedbackFields.sort();
     }
   }
 
@@ -597,11 +653,7 @@ class TypeDef {
       Element object = element.getElementsByTagName('object').first;
       fields = new List.from(
           object.getElementsByTagName('field').map((f) => new Field(f)));
-      fields.sort((a, b) {
-        if (a.optional && !b.optional) return 1;
-        if (!a.optional && b.optional) return -1;
-        return 0;
-      });
+      fields.sort();
     } else if (tags.contains('enum')) {
       isString = true;
     } else if (tags.contains('ref')) {
@@ -828,6 +880,9 @@ class RefType extends Type {
 
   String jsonConvert(String r) {
     if (ref == null) _resolve();
+    if (ref.name == 'RefactoringFeedback') {
+      return '${ref.name}.parse(kind, ${r})';
+    }
     return ref.isString ? r : '${ref.name}.parse(${r})';
   }
 
