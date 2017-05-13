@@ -5,6 +5,8 @@
 // This is a generated file.
 
 /// A library to access the analysis server API.
+///
+/// [AnalysisServer] is the main entry-point to this library.
 library analysis_server_lib;
 
 import 'dart:async';
@@ -27,6 +29,22 @@ const String generatedProtocolVersion = '1.18.1';
 typedef void MethodSend(String methodName);
 
 /// A class to communicate with an analysis server instance.
+///
+/// Here's a simple example of starting and communicating with the server:
+///
+/// ```dart
+/// import 'package:analysis_server_lib/analysis_server_lib.dart';
+///
+/// main() async {
+///   AnalysisServer server = await AnalysisServer.create();
+///   await server.server.onConnected.first;
+///
+///   VersionResult version = await server.server.getVersion();
+///   print(version.version);
+///
+///   server.dispose();
+/// }
+/// ```
 class AnalysisServer {
   /// Create and connect to a new analysis server instance.
   ///
@@ -1730,7 +1748,7 @@ class AnalysisError {
       this.severity, this.type, this.location, this.message, this.code,
       {this.correction, this.hasFix});
 
-  operator ==(o) =>
+  bool operator ==(o) =>
       o is AnalysisError &&
       severity == o.severity &&
       type == o.type &&
@@ -1740,7 +1758,7 @@ class AnalysisError {
       correction == o.correction &&
       hasFix == o.hasFix;
 
-  get hashCode =>
+  int get hashCode =>
       severity.hashCode ^
       type.hashCode ^
       location.hashCode ^
@@ -1751,7 +1769,7 @@ class AnalysisError {
       '[AnalysisError severity: ${severity}, type: ${type}, location: ${location}, message: ${message}, code: ${code}]';
 }
 
-/// A list of fixes associated with a specific error
+/// A list of fixes associated with a specific error.
 class AnalysisErrorFixes {
   static AnalysisErrorFixes parse(Map m) {
     if (m == null) return null;
@@ -2429,7 +2447,7 @@ class Location {
   Location(
       this.file, this.offset, this.length, this.startLine, this.startColumn);
 
-  operator ==(o) =>
+  bool operator ==(o) =>
       o is Location &&
       file == o.file &&
       offset == o.offset &&
@@ -2437,7 +2455,7 @@ class Location {
       startLine == o.startLine &&
       startColumn == o.startColumn;
 
-  get hashCode =>
+  int get hashCode =>
       file.hashCode ^
       offset.hashCode ^
       length.hashCode ^
@@ -3090,8 +3108,8 @@ class ExtractLocalVariableFeedback extends RefactoringFeedback {
 
   /// The lengths of the expressions that would be replaced by a reference to
   /// the variable. The lengths correspond to the offsets. In other words, for a
-  /// given expression, if the offset of that expression is offsets[i], then the
-  /// length of that expression is lengths[i].
+  /// given expression, if the offset of that expression is `offsets[i]`, then
+  /// the length of that expression is `lengths[i]`.
   final List<int> lengths;
 
   /// The offsets of the expressions that cover the specified selection, from
@@ -3150,8 +3168,8 @@ class ExtractMethodFeedback extends RefactoringFeedback {
   /// The lengths of the expressions or statements that would be replaced by an
   /// invocation of the method. The lengths correspond to the offsets. In other
   /// words, for a given expression (or block of statements), if the offset of
-  /// that expression is offsets[i], then the length of that expression is
-  /// lengths[i].
+  /// that expression is `offsets[i]`, then the length of that expression is
+  /// `lengths[i]`.
   final List<int> lengths;
 
   ExtractMethodFeedback(this.offset, this.length, this.returnType, this.names,

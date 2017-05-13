@@ -75,7 +75,25 @@ class Api {
     gen.writeln();
     gen.writeln("typedef void MethodSend(String methodName);");
     gen.writeln();
-    gen.writeDocs('A class to communicate with an analysis server instance.');
+    gen.writeDocs('''
+A class to communicate with an analysis server instance.
+
+Here's a simple example of starting and communicating with the server:
+
+```dart
+import 'package:analysis_server_lib/analysis_server_lib.dart';
+
+main() async {
+  AnalysisServer server = await AnalysisServer.create();
+  await server.server.onConnected.first;
+
+  VersionResult version = await server.server.getVersion();
+  print(version.version);
+
+  server.dispose();
+}
+```
+''');
     gen.writeStatement('class AnalysisServer {');
     gen.writeln(_staticFactory);
     gen.writeStatement('final Completer<int> processCompleter;');
@@ -757,13 +775,13 @@ class TypeDef {
     if (hasEquals) {
       gen.writeln();
       String str = fields.map((f) => "${f.name} == o.${f.name}").join(' && ');
-      gen.writeln("operator==(o) => o is ${name} && ${str};");
+      gen.writeln("bool operator==(o) => o is ${name} && ${str};");
       gen.writeln();
       String str2 = fields
           .where((f) => !f.optional)
           .map((f) => "${f.name}.hashCode")
           .join(' ^ ');
-      gen.writeln("get hashCode => ${str2};");
+      gen.writeln("int get hashCode => ${str2};");
     }
 
     if (hasToString) {
@@ -955,6 +973,8 @@ final String _headerCode = r'''
 // This is a generated file.
 
 /// A library to access the analysis server API.
+///
+/// [AnalysisServer] is the main entry-point to this library.
 library analysis_server_lib;
 
 import 'dart:async';
