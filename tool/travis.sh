@@ -15,7 +15,7 @@ dartanalyzer --fatal-warnings \
   tool/generate_analysis.dart \
   tool/src/analysis_tester.dart \
   lib/analysis_server_lib.dart \
-  test/analysis_server_test.dart
+  test/domains/*_test.dart
 
 # Run the tests.
 pub run test
