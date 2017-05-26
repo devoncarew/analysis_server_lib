@@ -63,13 +63,20 @@ class AnalysisServer {
   }) async {
     Completer<int> processCompleter = new Completer();
 
-    sdkPath ??= path.dirname(path.dirname(Platform.resolvedExecutable));
+    String vmPath;
+    if (sdkPath != null) {
+      vmPath =
+          path.join(sdkPath, 'bin', Platform.isWindows ? 'dart.exe' : 'dart');
+    } else {
+      sdkPath = path.dirname(path.dirname(Platform.resolvedExecutable));
+      vmPath = Platform.resolvedExecutable;
+    }
     scriptPath ??= '$sdkPath/bin/snapshots/analysis_server.dart.snapshot';
 
     List<String> args = [scriptPath, '--sdk', sdkPath];
     if (vmArgs != null) args.insertAll(0, vmArgs);
     if (serverArgs != null) args.addAll(serverArgs);
-    Process process = await Process.start(Platform.resolvedExecutable, args);
+    Process process = await Process.start(vmPath, args);
     process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
