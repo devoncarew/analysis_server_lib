@@ -53,14 +53,15 @@ class AnalysisServer {
   ///     analysis server
   /// - [onRead] called every time data is read from the server
   /// - [onWrite] called every time data is written to the server
-  static Future<AnalysisServer> create({
-    String sdkPath,
-    String scriptPath,
-    onRead(String),
-    onWrite(String),
-    List<String> vmArgs,
-    List<String> serverArgs,
-  }) async {
+  static Future<AnalysisServer> create(
+      {String sdkPath,
+      String scriptPath,
+      onRead(String),
+      onWrite(String),
+      List<String> vmArgs,
+      List<String> serverArgs,
+      String clientId,
+      String clientVersion}) async {
     Completer<int> processCompleter = new Completer();
 
     String vmPath;
@@ -76,6 +77,9 @@ class AnalysisServer {
     List<String> args = [scriptPath, '--sdk', sdkPath];
     if (vmArgs != null) args.insertAll(0, vmArgs);
     if (serverArgs != null) args.addAll(serverArgs);
+    if (clientId != null) args.add('--client-id=$clientId');
+    if (clientVersion != null) args.add('--client-version=$clientVersion');
+
     Process process = await Process.start(vmPath, args);
     process.exitCode.then((code) => processCompleter.complete(code));
 
