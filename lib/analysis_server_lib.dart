@@ -116,6 +116,7 @@ class AnalysisServer {
   EditDomain _edit;
   ExecutionDomain _execution;
   DiagnosticDomain _diagnostic;
+  AnalyticsDomain _analytics;
 
   /// Connect to an existing analysis server instance.
   AnalysisServer(Stream<String> inStream, void writeMessage(String message),
@@ -130,6 +131,7 @@ class AnalysisServer {
     _edit = new EditDomain(this);
     _execution = new ExecutionDomain(this);
     _diagnostic = new DiagnosticDomain(this);
+    _analytics = new AnalyticsDomain(this);
   }
 
   ServerDomain get server => _server;
@@ -139,6 +141,7 @@ class AnalysisServer {
   EditDomain get edit => _edit;
   ExecutionDomain get execution => _execution;
   DiagnosticDomain get diagnostic => _diagnostic;
+  AnalyticsDomain get analytics => _analytics;
 
   Stream<String> get onSend => _onSend.stream;
   Stream<String> get onReceive => _onReceive.stream;
@@ -1687,6 +1690,92 @@ class ServerPortResult {
   ServerPortResult(this.port);
 }
 
+// analytics domain
+
+/// The analytics domain contains APIs related to reporting analytics.
+///
+/// This API allows clients to expose a UI option to enable and disable the
+/// analysis server's reporting of analytics. This value is shared with other
+/// tools and can change outside of this API; because of this, clients should
+/// use the analysis server's flag as the system of record. Clients can choose
+/// to send in additional analytics (see `sendEvent` and `sendTiming`) if they
+/// so choose. Dart command-line tools provide a disclaimer similar to: ` Dart
+/// SDK tools anonymously report feature usage statistics and basic crash
+/// reports to help improve Dart tools over time. See Google's privacy policy:
+/// https://www.google.com/intl/en/policies/privacy/. `
+///
+/// The analysis server will send it's own analytics data (for example,
+/// operations performed, operating system type, SDK version). No data (from the
+/// analysis server or from clients) will be sent if analytics is disabled.
+@experimental
+class AnalyticsDomain extends Domain {
+  AnalyticsDomain(AnalysisServer server) : super(server, 'analytics');
+
+  /// Query whether analytics is enabled.
+  ///
+  /// This flag controls whether the analysis server sends any analytics data to
+  /// the cloud. If disabled, the analysis server does not send any analytics
+  /// data, and any data sent to it by clients (from `sendEvent` and
+  /// `sendTiming`) will be ignored.
+  ///
+  /// The value of this flag can be changed by other tools outside of the
+  /// analysis server's process. When you query the flag, you get the value of
+  /// the flag at a given moment. Clients should not use the value returned to
+  /// decide whether or not to send the `sendEvent` and `sendTiming` requests.
+  /// Those requests should be used unconditionally and server will determine
+  /// whether or not it is appropriate to forward the information to the cloud
+  /// at the time each request is received.
+  Future<IsEnabledResult> isEnabled() =>
+      _call('analytics.isEnabled').then(IsEnabledResult.parse);
+
+  /// Enable or disable the sending of analytics data. Note that there are other
+  /// ways for users to change this setting, so clients cannot assume that they
+  /// have complete control over this setting. In particular, there is no
+  /// guarantee that the result returned by the `isEnabled` request will match
+  /// the last value set via this request.
+  Future enable(bool value) => _call('analytics.enable', {'value': value});
+
+  /// Send information about client events.
+  ///
+  /// Ask the analysis server to include the fact that an action was performed
+  /// in the client as part of the analytics data being sent. The data will only
+  /// be included if the sending of analytics data is enabled at the time the
+  /// request is processed. The action that was performed is indicated by the
+  /// value of the `action` field.
+  ///
+  /// The value of the action field should not include the identity of the
+  /// client. The analytics data sent by server will include the client id
+  /// passed in using the `--client-id` command-line argument. The request will
+  /// be ignored if the client id was not provided when server was started.
+  Future sendEvent(String action) =>
+      _call('analytics.sendEvent', {'action': action});
+
+  /// Send timing information for client events (e.g. code completions).
+  ///
+  /// Ask the analysis server to include the fact that a timed event occurred as
+  /// part of the analytics data being sent. The data will only be included if
+  /// the sending of analytics data is enabled at the time the request is
+  /// processed.
+  ///
+  /// The value of the event field should not include the identity of the
+  /// client. The analytics data sent by server will include the client id
+  /// passed in using the `--client-id` command-line argument. The request will
+  /// be ignored if the client id was not provided when server was started.
+  Future sendTiming(String event, int millis) {
+    Map m = {'event': event, 'millis': millis};
+    return _call('analytics.sendTiming', m);
+  }
+}
+
+class IsEnabledResult {
+  static IsEnabledResult parse(Map m) => new IsEnabledResult(m['enabled']);
+
+  /// Whether sending analytics is enabled or not.
+  final bool enabled;
+
+  IsEnabledResult(this.enabled);
+}
+
 // type definitions
 
 /// A directive to begin overlaying the contents of a file. The supplied content
@@ -1900,7 +1989,7 @@ class AnalysisStatus {
 /// (RemoveContentOverlay)[#type_RemoveContentOverlay].
 ///
 /// If any of the edits cannot be applied due to its offset or length being out
-/// of range, an INVALID_OVERLAY_CHANGE error will be reported.
+/// of range, an `INVALID_OVERLAY_CHANGE` error will be reported.
 class ChangeContentOverlay extends ContentOverlayType implements Jsonable {
   static ChangeContentOverlay parse(Map m) {
     if (m == null) return null;
@@ -1986,7 +2075,7 @@ class CompletionSuggestion implements Jsonable {
   @optional
   final String docSummary;
 
-  /// The Dartdoc associated with the element being suggested, This field is
+  /// The Dartdoc associated with the element being suggested. This field is
   /// omitted if there is no Dartdoc associated with the element.
   @optional
   final String docComplete;
@@ -2410,7 +2499,7 @@ class LinkedEditGroup {
 }
 
 /// A suggestion of a value that could be used to replace all of the linked edit
-/// regions in a LinkedEditGroup.
+/// regions in a (LinkedEditGroup)[#type_LinkedEditGroup].
 class LinkedEditSuggestion {
   static LinkedEditSuggestion parse(Map m) {
     if (m == null) return null;
@@ -2569,7 +2658,7 @@ class Outline {
   final Element element;
 
   /// The offset of the first character of the element. This is different than
-  /// the offset in the Element, which if the offset of the name of the element.
+  /// the offset in the Element, which is the offset of the name of the element.
   /// It can be used, for example, to map locations in the file back to an
   /// outline.
   final int offset;
@@ -2583,6 +2672,22 @@ class Outline {
   final List<Outline> children;
 
   Outline(this.element, this.offset, this.length, {this.children});
+}
+
+/// A description of a member that is being overridden.
+class OverriddenMember {
+  static OverriddenMember parse(Map m) {
+    if (m == null) return null;
+    return new OverriddenMember(Element.parse(m['element']), m['className']);
+  }
+
+  /// The element that is being overridden.
+  final Element element;
+
+  /// The name of the class in which the member is defined.
+  final String className;
+
+  OverriddenMember(this.element, this.className);
 }
 
 /// A description of a member that overrides an inherited member.
@@ -2617,22 +2722,6 @@ class Override {
 
   Override(this.offset, this.length,
       {this.superclassMember, this.interfaceMembers});
-}
-
-/// A description of a member that is being overridden.
-class OverriddenMember {
-  static OverriddenMember parse(Map m) {
-    if (m == null) return null;
-    return new OverriddenMember(Element.parse(m['element']), m['className']);
-  }
-
-  /// The element that is being overridden.
-  final Element element;
-
-  /// The name of the class in which the member is defined.
-  final String className;
-
-  OverriddenMember(this.element, this.className);
 }
 
 /// A position within a file.
@@ -2695,7 +2784,7 @@ class RefactoringMethodParameter {
 
   /// The parameter list of the parameter's function type. If the parameter is
   /// not of a function type, this field will not be defined. If the function
-  /// type has zero parameters, this field will have a value of "()".
+  /// type has zero parameters, this field will have a value of '()'.
   @optional
   final String parameters;
 
