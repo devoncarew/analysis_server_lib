@@ -13,7 +13,7 @@ dart -c tool/generate_analysis.dart
 # Verify that the libraries are error free.
 dartanalyzer --fatal-warnings \
   tool/generate_analysis.dart \
-  tool/src/analysis_tester.dart \
+  tool/analysis_tester.dart \
   lib/analysis_server_lib.dart \
   test/domains/*_test.dart
 

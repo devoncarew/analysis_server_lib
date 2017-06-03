@@ -28,8 +28,25 @@ main(List<String> args) {
       .getElementsByTagName('refactorings')
       .first
       .getElementsByTagName('refactoring');
+
+  // Common common_types_spec.html.
+  File commonTypesFile = new File('tool/common_types_spec.html');
+  Document commonTypesDoc = parse(commonTypesFile.readAsStringSync());
+  print('Parsed ${commonTypesFile.path}.');
+  List<Element> commonTypedefs = commonTypesDoc.body
+      .getElementsByTagName('types')
+      .first
+      .getElementsByTagName('type');
+
+  List<Element> combinedTypeDefs = new List()
+    ..addAll(typedefs)
+    ..addAll(commonTypedefs);
+  combinedTypeDefs.sort((Element a, Element b) {
+    return a.attributes['name'].compareTo(b.attributes['name']);
+  });
+
   api = new Api(ver.text);
-  api.parse(domains, typedefs, refactorings);
+  api.parse(domains, combinedTypeDefs, refactorings);
 
   // Generate code from the model.
   File outputFile = new File('lib/analysis_server_lib.dart');
