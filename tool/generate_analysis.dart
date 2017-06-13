@@ -79,6 +79,7 @@ class Api {
     findRef('SourceEdit').setCallParam();
     findRef('CompletionSuggestion').setCallParam();
     findRef('Element').setCallParam();
+    findRef('Location').setCallParam();
     typedefs
         .where((def) => def.name.endsWith('ContentOverlay'))
         .forEach((def) => def.setCallParam());
@@ -791,11 +792,10 @@ class TypeDef {
     if (callParam) {
       gen.writeln();
       String map = fields.map((f) {
-        if (f.isJsonable) {
+        if (f.isJsonable && f.type.typeName != 'String') {
           return "'${f.name}': ${f.name}?.toMap()";
-        } else {
-          return "'${f.name}': ${f.name}";
         }
+        return "'${f.name}': ${f.name}";
       }).join(', ');
       gen.writeln("Map toMap() => _stripNullValues({${map}});");
     }

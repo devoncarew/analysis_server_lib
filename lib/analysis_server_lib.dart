@@ -2284,7 +2284,7 @@ class Element implements Jsonable {
         'kind': kind,
         'name': name,
         'flags': flags,
-        'location': location,
+        'location': location?.toMap(),
         'parameters': parameters,
         'returnType': returnType,
         'typeParameters': typeParameters
@@ -2530,7 +2530,7 @@ class LinkedEditSuggestion {
 }
 
 /// A location (character range) within a file.
-class Location {
+class Location implements Jsonable {
   static Location parse(Map m) {
     if (m == null) return null;
     return new Location(
@@ -2556,6 +2556,14 @@ class Location {
 
   Location(
       this.file, this.offset, this.length, this.startLine, this.startColumn);
+
+  Map toMap() => _stripNullValues({
+        'file': file,
+        'offset': offset,
+        'length': length,
+        'startLine': startLine,
+        'startColumn': startColumn
+      });
 
   bool operator ==(o) =>
       o is Location &&
