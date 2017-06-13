@@ -78,6 +78,7 @@ class Api {
     // Mark some types as jsonable - we can send them back over the wire.
     findRef('SourceEdit').setCallParam();
     findRef('CompletionSuggestion').setCallParam();
+    findRef('Element').setCallParam();
     typedefs
         .where((def) => def.name.endsWith('ContentOverlay'))
         .forEach((def) => def.setCallParam());
@@ -564,6 +565,8 @@ class Field implements Comparable {
 
   void setCallParam() => type.setCallParam();
 
+  bool get isJsonable => type.isCallParam();
+
   String toString() => name;
 
   int compareTo(other) {
@@ -712,6 +715,8 @@ class TypeDef {
     _callParam = true;
   }
 
+  bool isCallParam() => _callParam;
+
   void generate(DartGenerator gen) {
     if (name == 'RefactoringOptions' ||
         name == 'RefactoringFeedback' ||
@@ -785,7 +790,13 @@ class TypeDef {
 
     if (callParam) {
       gen.writeln();
-      String map = fields.map((f) => "'${f.name}': ${f.name}").join(', ');
+      String map = fields.map((f) {
+        if (f.isJsonable) {
+          return "'${f.name}': ${f.name}?.toMap()";
+        } else {
+          return "'${f.name}': ${f.name}";
+        }
+      }).join(', ');
       gen.writeln("Map toMap() => _stripNullValues({${map}});");
     }
 
@@ -850,6 +861,8 @@ abstract class Type {
   String jsonConvert(String ref);
 
   void setCallParam();
+
+  bool isCallParam() => false;
 
   bool get isMap => typeName == 'Map' || typeName.startsWith('Map<');
 
@@ -925,6 +938,8 @@ class RefType extends Type {
     if (ref == null) _resolve();
     ref.setCallParam();
   }
+
+  bool isCallParam() => ref.isCallParam();
 
   void _resolve() {
     try {

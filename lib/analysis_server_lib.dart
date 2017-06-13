@@ -2186,7 +2186,7 @@ class CompletionSuggestion implements Jsonable {
         'declaringType': declaringType,
         'defaultArgumentListString': defaultArgumentListString,
         'defaultArgumentListTextRanges': defaultArgumentListTextRanges,
-        'element': element,
+        'element': element?.toMap(),
         'returnType': returnType,
         'parameterNames': parameterNames,
         'parameterTypes': parameterTypes,
@@ -2235,7 +2235,7 @@ class ContextData {
 }
 
 /// Information about an element (something that can be declared in code).
-class Element {
+class Element implements Jsonable {
   static Element parse(Map m) {
     if (m == null) return null;
     return new Element(m['kind'], m['name'], m['flags'],
@@ -2279,6 +2279,16 @@ class Element {
 
   Element(this.kind, this.name, this.flags,
       {this.location, this.parameters, this.returnType, this.typeParameters});
+
+  Map toMap() => _stripNullValues({
+        'kind': kind,
+        'name': name,
+        'flags': flags,
+        'location': location,
+        'parameters': parameters,
+        'returnType': returnType,
+        'typeParameters': typeParameters
+      });
 
   String toString() =>
       '[Element kind: ${kind}, name: ${name}, flags: ${flags}]';
