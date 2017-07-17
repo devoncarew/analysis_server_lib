@@ -61,7 +61,8 @@ class AnalysisServer {
       List<String> vmArgs,
       List<String> serverArgs,
       String clientId,
-      String clientVersion}) async {
+      String clientVersion,
+      Map<String, String> processEnvironment}) async {
     Completer<int> processCompleter = new Completer();
 
     String vmPath;
@@ -80,7 +81,8 @@ class AnalysisServer {
     if (clientId != null) args.add('--client-id=$clientId');
     if (clientVersion != null) args.add('--client-version=$clientVersion');
 
-    Process process = await Process.start(vmPath, args);
+    Process process =
+        await Process.start(vmPath, args, environment: processEnvironment);
     process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
