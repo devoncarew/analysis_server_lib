@@ -53,7 +53,8 @@ main(List<String> args) {
   DartGenerator generator = new DartGenerator();
   api.generate(generator);
   outputFile.writeAsStringSync(generator.toString());
-  Process.runSync('dartfmt', ['-w', outputFile.path]);
+  Process.runSync(
+      'dartfmt${Platform.isWindows ? ".bat" : ""}', ['-w', outputFile.path]);
   print('Wrote ${outputFile.path}.');
 }
 
