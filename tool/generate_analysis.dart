@@ -1038,7 +1038,8 @@ final String _staticFactory = r'''
   static Future<AnalysisServer> create(
       {String sdkPath, String scriptPath, onRead(String), onWrite(String),
        List<String> vmArgs, List<String> serverArgs,
-       String clientId, String clientVersion}) async {
+       String clientId, String clientVersion,
+      Map<String, String> processEnvironment}) async {
     Completer<int> processCompleter = new Completer();
 
     String vmPath;
@@ -1056,7 +1057,7 @@ final String _staticFactory = r'''
     if (clientId != null) args.add('--client-id=$clientId');
     if (clientVersion != null) args.add('--client-version=$clientVersion');
 
-    Process process = await Process.start(vmPath, args);
+    Process process = await Process.start(vmPath, args, environment: processEnvironment);
     process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
