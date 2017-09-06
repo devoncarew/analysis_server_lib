@@ -1036,7 +1036,8 @@ final String _staticFactory = r'''
   /// - [onRead] called every time data is read from the server
   /// - [onWrite] called every time data is written to the server
   static Future<AnalysisServer> create(
-      {String sdkPath, String scriptPath, onRead(String), onWrite(String),
+      {String sdkPath, String scriptPath,
+       void onRead(String str), void onWrite(String str),
        List<String> vmArgs, List<String> serverArgs,
        String clientId, String clientVersion,
       Map<String, String> processEnvironment}) async {

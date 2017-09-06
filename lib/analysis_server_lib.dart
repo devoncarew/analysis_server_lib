@@ -56,8 +56,8 @@ class AnalysisServer {
   static Future<AnalysisServer> create(
       {String sdkPath,
       String scriptPath,
-      onRead(String),
-      onWrite(String),
+      void onRead(String str),
+      void onWrite(String str),
       List<String> vmArgs,
       List<String> serverArgs,
       String clientId,
