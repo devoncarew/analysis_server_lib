@@ -482,6 +482,8 @@ class Request {
 }
 
 class Notification {
+  static Set<String> disambiguateEvents = new Set.from(['FlutterOutline']);
+
   final Domain domain;
   String event;
   String docs;
@@ -499,7 +501,13 @@ class Notification {
 
   String get onName => 'on${titleCase(event)}';
 
-  String get className => '${titleCase(domain.name)}${titleCase(event)}';
+  String get className {
+    String name = '${titleCase(domain.name)}${titleCase(event)}';
+    if (disambiguateEvents.contains(name)) {
+      name = name + 'Event';
+    }
+    return name;
+  }
 
   void generate(DartGenerator gen) {
     gen.writeDocs(docs);
@@ -760,11 +768,12 @@ class TypeDef {
     if (_fields.isNotEmpty) {
       gen.writeln();
       _fields.forEach((field) {
+        gen.writeln();
+        gen.writeDocs(field.docs);
         if (field.deprecated) {
           gen.write('@deprecated ');
-        } else {
-          gen.writeDocs(field.docs);
         }
+
         if (field.optional) gen.write('@optional ');
         gen.writeln('final ${field.type} ${field.name};');
       });
@@ -816,7 +825,7 @@ class TypeDef {
     if (hasToString) {
       gen.writeln();
       String str = fields
-          .where((f) => !f.optional)
+          .where((f) => (!f.optional && !f.deprecated))
           .map((f) => "${f.name}: \${${f.name}}")
           .join(', ');
       gen.writeln("String toString() => '[${name} ${str}]';");
