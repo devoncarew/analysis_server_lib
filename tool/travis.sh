@@ -15,3 +15,6 @@ dartanalyzer --fatal-warnings .
 
 # Run the tests.
 pub run test
+
+# Have a basic smoke test of Dart 2 at runtime.
+dart --preview-dart-2 tool/analysis_tester.dart
