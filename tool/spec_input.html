@@ -7,7 +7,7 @@
 <body>
 <h1>Analysis Server API Specification</h1>
 <h1 style="color:#999999">Version
-  <version>1.18.7</version>
+  <version>1.20.0</version>
 </h1>
 <p>
   This document contains a specification of the API provided by the
@@ -1579,6 +1579,13 @@
       Return top-level and class member declarations.
     </p>
     <params>
+      <field name="file" optional="true">
+        <ref>FilePath</ref>
+        <p>
+          If this field is provided, return only declarations in this file.
+          If this field is missing, return declarations in all files.
+        </p>
+      </field>
       <field name="pattern" optional="true">
         <ref>String</ref>
         <p>
@@ -2699,14 +2706,13 @@
           The outline associated with the file.
         </p>
       </field>
-      <field name="instrumentationEdits">
-        <list>
-          <ref>SourceEdit</ref>
-        </list>
+      <field name="instrumentedCode" optional="true">
+        <ref>String</ref>
         <p>
-          If the file has Flutter widgets that can be rendered, the list
-          of edits that should be applied to the file to instrument widgets and
-          associate them with outline nodes.
+          If the file has Flutter widgets that can be rendered, this field
+          has the instrumented content of the file, that allows associating
+          widgets with corresponding outline nodes. If there are no widgets
+          to render, this field is absent.
         </p>
       </field>
     </params>
@@ -3091,6 +3097,19 @@
           The length of the element.
         </p>
       </field>
+      <field name="codeOffset">
+        <ref>int</ref>
+        <p>
+          The offset of the first character of the element code, which is
+          neither documentation, nor annotation.
+        </p>
+      </field>
+      <field name="codeLength">
+        <ref>int</ref>
+        <p>
+          The length of the element code.
+        </p>
+      </field>
       <field name="label" optional="true">
         <ref>String</ref>
         <p>
@@ -3153,6 +3172,14 @@
           with this node.
         </p>
       </field>
+      <field name="isWidgetClass" optional="true">
+        <ref>bool</ref>
+        <p>
+          True if the node is a widget class, so it can potentially be
+          rendered, even if it does not yet have the rendering constructor.
+          This field is omitted if the node is not a widget class.
+        </p>
+      </field>
       <field name="renderConstructor" optional="true">
         <ref>String</ref>
         <p>
@@ -3162,19 +3189,26 @@
           widget class that can be rendered.
         </p>
       </field>
+      <field name="stateClassName" optional="true">
+        <ref>String</ref>
+        <p>
+          If the node is a StatefulWidget, and its state class is defined in
+          the same file, the name of the state class.
+        </p>
+      </field>
       <field name="stateOffset" optional="true">
         <ref>int</ref>
         <p>
-          If the node is a StatefulWidget that can be rendered, and its State
-          class is defined in the same file, the offset of the State class code
+          If the node is a StatefulWidget that can be rendered, and its state
+          class is defined in the same file, the offset of the state class code
           in the file.
         </p>
       </field>
       <field name="stateLength" optional="true">
         <ref>int</ref>
         <p>
-          If the node is a StatefulWidget that can be rendered, and its State
-          class is defined in the same file, the length of the State class code
+          If the node is a StatefulWidget that can be rendered, and its state
+          class is defined in the same file, the length of the state class code
           in the file.
         </p>
       </field>
@@ -4218,6 +4252,23 @@
       </field>
     </options>
   </refactoring>
+  <refactoring kind="EXTRACT_WIDGET">
+    <p>
+      Create a new class that extends StatelessWidget, whose build() method is
+      the widget creation expression, or a method returning a Flutter widget,
+      at the specified offset.
+    </p>
+    <feedback>
+    </feedback>
+    <options>
+      <field name="name">
+        <ref>String</ref>
+        <p>
+          The name that the widget class should be given.
+        </p>
+      </field>
+    </options>
+  </refactoring>
   <refactoring kind="INLINE_LOCAL_VARIABLE">
     <p>
       Inline the initializer expression of a local variable in
@@ -4331,7 +4382,7 @@
         <ref>int</ref>
         <p>
           The offset to the beginning of the name selected to be
-          renamed.
+          renamed, or -1 if the name does not exist yet.
         </p>
       </field>
       <field name="length">
