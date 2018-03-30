@@ -1071,7 +1071,7 @@ final String _staticFactory = r'''
     process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
-        .transform(UTF8.decoder)
+        .transform(utf8.decoder)
         .transform(const LineSplitter())
         .map((String message) {
       if (onRead != null) onRead(message);
@@ -1120,7 +1120,7 @@ final String _serverCode = r'''
     }
 
     try {
-      var json = JSON.decode(message);
+      var json = jsonDecode(message);
 
       if (json['id'] == null) {
         // Handle a notification.
@@ -1152,9 +1152,9 @@ final String _serverCode = r'''
     }
   }
 
-  Future _call(String method, [Map args]) {
+  Future<Map> _call(String method, [Map args]) {
     String id = '${++_id}';
-    _completers[id] = new Completer();
+    _completers[id] = new Completer<Map>();
     _methodNames[id] = method;
     Map m = {'id': id, 'method': method};
     if (args != null) m['params'] = args;
@@ -1180,7 +1180,7 @@ abstract class Domain {
     server._domains[name] = this;
   }
 
-  Future _call(String method, [Map args]) => server._call(method, args);
+  Future<Map> _call(String method, [Map args]) => server._call(method, args);
 
   Stream<dynamic> _listen(String name, Function cvt) {
     if (_streams[name] == null) {
