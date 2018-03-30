@@ -239,7 +239,7 @@ abstract class Domain {
   final AnalysisServer server;
   final String name;
 
-  Map<String, StreamController> _controllers = {};
+  Map<String, StreamController<Map>> _controllers = {};
   Map<String, Stream> _streams = {};
 
   Domain(this.server, this.name) {
@@ -248,10 +248,10 @@ abstract class Domain {
 
   Future<Map> _call(String method, [Map args]) => server._call(method, args);
 
-  Stream<dynamic> _listen(String name, Function cvt) {
+  Stream<E> _listen<E>(String name, E cvt(Map m)) {
     if (_streams[name] == null) {
-      _controllers[name] = new StreamController.broadcast();
-      _streams[name] = _controllers[name].stream.map(cvt);
+      _controllers[name] = new StreamController<Map>.broadcast();
+      _streams[name] = _controllers[name].stream.map<E>(cvt);
     }
 
     return _streams[name];
