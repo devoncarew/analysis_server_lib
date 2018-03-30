@@ -86,7 +86,7 @@ class AnalysisServer {
     process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
-        .transform(UTF8.decoder)
+        .transform(utf8.decoder)
         .transform(const LineSplitter())
         .map((String message) {
       if (onRead != null) onRead(message);
@@ -186,7 +186,7 @@ class AnalysisServer {
     }
 
     try {
-      var json = JSON.decode(message);
+      var json = jsonDecode(message);
 
       if (json['id'] == null) {
         // Handle a notification.
