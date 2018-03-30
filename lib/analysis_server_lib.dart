@@ -24,7 +24,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.18.7';
+const String generatedProtocolVersion = '1.20.0';
 
 typedef void MethodSend(String methodName);
 
@@ -1233,8 +1233,9 @@ class SearchDomain extends Domain {
   /// Return top-level and class member declarations.
   @experimental
   Future<ElementDeclarationsResult> getElementDeclarations(
-      {String pattern, int maxResults}) {
+      {String file, String pattern, int maxResults}) {
     Map m = {};
+    if (file != null) m['file'] = file;
     if (pattern != null) m['pattern'] = pattern;
     if (maxResults != null) m['maxResults'] = maxResults;
     return _call('search.getElementDeclarations', m)
@@ -2050,13 +2051,9 @@ class FlutterDomain extends Domain {
 }
 
 class FlutterOutlineEvent {
-  static FlutterOutlineEvent parse(Map m) => new FlutterOutlineEvent(
-      m['file'],
-      FlutterOutline.parse(m['outline']),
-      m['instrumentationEdits'] == null
-          ? null
-          : new List.from(
-              m['instrumentationEdits'].map((obj) => SourceEdit.parse(obj))));
+  static FlutterOutlineEvent parse(Map m) =>
+      new FlutterOutlineEvent(m['file'], FlutterOutline.parse(m['outline']),
+          instrumentedCode: m['instrumentedCode']);
 
   /// The file with which the outline is associated.
   final String file;
@@ -2064,12 +2061,14 @@ class FlutterOutlineEvent {
   /// The outline associated with the file.
   final FlutterOutline outline;
 
-  /// If the file has Flutter widgets that can be rendered, the list of edits
-  /// that should be applied to the file to instrument widgets and associate
-  /// them with outline nodes.
-  final List<SourceEdit> instrumentationEdits;
+  /// If the file has Flutter widgets that can be rendered, this field has the
+  /// instrumented content of the file, that allows associating widgets with
+  /// corresponding outline nodes. If there are no widgets to render, this field
+  /// is absent.
+  @optional
+  final String instrumentedCode;
 
-  FlutterOutlineEvent(this.file, this.outline, this.instrumentationEdits);
+  FlutterOutlineEvent(this.file, this.outline, {this.instrumentedCode});
 }
 
 // type definitions
@@ -2708,7 +2707,8 @@ class ExecutableFile {
 class FlutterOutline {
   static FlutterOutline parse(Map m) {
     if (m == null) return null;
-    return new FlutterOutline(m['kind'], m['offset'], m['length'],
+    return new FlutterOutline(
+        m['kind'], m['offset'], m['length'], m['codeOffset'], m['codeLength'],
         label: m['label'],
         dartElement: Element.parse(m['dartElement']),
         attributes: m['attributes'] == null
@@ -2723,7 +2723,9 @@ class FlutterOutline {
             : new List.from(
                 m['children'].map((obj) => FlutterOutline.parse(obj))),
         id: m['id'],
+        isWidgetClass: m['isWidgetClass'],
         renderConstructor: m['renderConstructor'],
+        stateClassName: m['stateClassName'],
         stateOffset: m['stateOffset'],
         stateLength: m['stateLength']);
   }
@@ -2739,6 +2741,13 @@ class FlutterOutline {
 
   /// The length of the element.
   final int length;
+
+  /// The offset of the first character of the element code, which is neither
+  /// documentation, nor annotation.
+  final int codeOffset;
+
+  /// The length of the element code.
+  final int codeLength;
 
   /// The text label of the node children of the node. It is provided for any
   /// FlutterOutlineKind.GENERIC node, where better information is not
@@ -2781,6 +2790,12 @@ class FlutterOutline {
   @optional
   final int id;
 
+  /// True if the node is a widget class, so it can potentially be rendered,
+  /// even if it does not yet have the rendering constructor. This field is
+  /// omitted if the node is not a widget class.
+  @optional
+  final bool isWidgetClass;
+
   /// If the node is a widget class that can be rendered for IDE, the name of
   /// the constructor that should be used to instantiate the widget. Empty
   /// string for default constructor. Absent if the node is not a widget class
@@ -2788,19 +2803,25 @@ class FlutterOutline {
   @optional
   final String renderConstructor;
 
-  /// If the node is a StatefulWidget that can be rendered, and its State class
-  /// is defined in the same file, the offset of the State class code in the
+  /// If the node is a StatefulWidget, and its state class is defined in the
+  /// same file, the name of the state class.
+  @optional
+  final String stateClassName;
+
+  /// If the node is a StatefulWidget that can be rendered, and its state class
+  /// is defined in the same file, the offset of the state class code in the
   /// file.
   @optional
   final int stateOffset;
 
-  /// If the node is a StatefulWidget that can be rendered, and its State class
-  /// is defined in the same file, the length of the State class code in the
+  /// If the node is a StatefulWidget that can be rendered, and its state class
+  /// is defined in the same file, the length of the state class code in the
   /// file.
   @optional
   final int stateLength;
 
-  FlutterOutline(this.kind, this.offset, this.length,
+  FlutterOutline(
+      this.kind, this.offset, this.length, this.codeOffset, this.codeLength,
       {this.label,
       this.dartElement,
       this.attributes,
@@ -2809,7 +2830,9 @@ class FlutterOutline {
       this.variableName,
       this.children,
       this.id,
+      this.isWidgetClass,
       this.renderConstructor,
+      this.stateClassName,
       this.stateOffset,
       this.stateLength});
 }
@@ -3720,6 +3743,7 @@ class Refactorings {
   static const String CONVERT_METHOD_TO_GETTER = 'CONVERT_METHOD_TO_GETTER';
   static const String EXTRACT_LOCAL_VARIABLE = 'EXTRACT_LOCAL_VARIABLE';
   static const String EXTRACT_METHOD = 'EXTRACT_METHOD';
+  static const String EXTRACT_WIDGET = 'EXTRACT_WIDGET';
   static const String INLINE_LOCAL_VARIABLE = 'INLINE_LOCAL_VARIABLE';
   static const String INLINE_METHOD = 'INLINE_METHOD';
   static const String MOVE_FILE = 'MOVE_FILE';
@@ -3789,6 +3813,18 @@ class ExtractMethodRefactoringOptions extends RefactoringOptions {
         'parameters': parameters,
         'extractAll': extractAll
       });
+}
+
+/// Create a new class that extends StatelessWidget, whose build() method is the
+/// widget creation expression, or a method returning a Flutter widget, at the
+/// specified offset.
+class ExtractWidgetRefactoringOptions extends RefactoringOptions {
+  /// The name that the widget class should be given.
+  final String name;
+
+  ExtractWidgetRefactoringOptions({this.name});
+
+  Map toMap() => _stripNullValues({'name': name});
 }
 
 /// Inline a method in place of one or all references to that method.
@@ -3994,7 +4030,8 @@ class RenameFeedback extends RefactoringFeedback {
   static RenameFeedback parse(Map m) => new RenameFeedback(
       m['offset'], m['length'], m['elementKindName'], m['oldName']);
 
-  /// The offset to the beginning of the name selected to be renamed.
+  /// The offset to the beginning of the name selected to be renamed, or -1 if
+  /// the name does not exist yet.
   final int offset;
 
   /// The length of the name selected to be renamed.
