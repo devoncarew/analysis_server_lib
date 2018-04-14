@@ -2023,6 +2023,15 @@ class FlutterDomain extends Domain {
     return _listen('flutter.outline', FlutterOutlineEvent.parse);
   }
 
+  /// Return the change that adds the forDesignTime() constructor for the widget
+  /// class at the given offset.
+  Future<ChangeAddForDesignTimeConstructorResult>
+      getChangeAddForDesignTimeConstructor(String file, int offset) {
+    Map m = {'file': file, 'offset': offset};
+    return _call('flutter.getChangeAddForDesignTimeConstructor', m)
+        .then(ChangeAddForDesignTimeConstructorResult.parse);
+  }
+
   /// Subscribe for services that are specific to individual files. All previous
   /// subscriptions are replaced by the current set of subscriptions. If a given
   /// service is not included as a key in the map then no files will be
@@ -2069,6 +2078,18 @@ class FlutterOutlineEvent {
   final String instrumentedCode;
 
   FlutterOutlineEvent(this.file, this.outline, {this.instrumentedCode});
+}
+
+class ChangeAddForDesignTimeConstructorResult {
+  static ChangeAddForDesignTimeConstructorResult parse(Map m) =>
+      new ChangeAddForDesignTimeConstructorResult(
+          SourceChange.parse(m['change']));
+
+  /// The change that adds the forDesignTime() constructor. If the change cannot
+  /// be produced, an error is returned.
+  final SourceChange change;
+
+  ChangeAddForDesignTimeConstructorResult(this.change);
 }
 
 // type definitions
