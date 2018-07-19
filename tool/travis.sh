@@ -8,7 +8,7 @@
 set -e
 
 # Verify the library re-generates.
-dart -c tool/generate_analysis.dart
+dart --enable-asserts tool/generate_analysis.dart
 
 # Verify that the libraries are error free.
 dartanalyzer --fatal-warnings .
@@ -16,5 +16,5 @@ dartanalyzer --fatal-warnings .
 # Run the tests.
 pub run test
 
-# Have a basic smoke test of Dart 2 at runtime.
-dart --preview-dart-2 tool/analysis_tester.dart
+# Run a basic smoke test.
+dart tool/analysis_tester.dart
