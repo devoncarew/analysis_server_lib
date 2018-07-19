@@ -1,8 +1,7 @@
 language: dart
-script:
-  - ./tool/travis.sh
 dart:
   - dev
+script: ./tool/travis.sh
 
 branches:
   only:
