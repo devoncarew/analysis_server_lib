@@ -24,7 +24,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.20.0';
+const String generatedProtocolVersion = '1.21.0';
 
 typedef void MethodSend(String methodName);
 
@@ -223,7 +223,7 @@ class AnalysisServer {
     String id = '${++_id}';
     _completers[id] = new Completer<Map>();
     _methodNames[id] = method;
-    Map m = {'id': id, 'method': method};
+    final Map m = {'id': id, 'method': method};
     if (args != null) m['params'] = args;
     String message = _jsonEncoder.encode(m);
     if (_willSend != null) _willSend(method);
@@ -409,9 +409,7 @@ class ServerStatus {
   /// performed and if so what is being analyzed.
   @optional
   final AnalysisStatus analysis;
-
-  /// The current status of pub execution, indicating whether we are currently
-  /// running pub.
+  @deprecated
   @optional
   final PubStatus pub;
 
@@ -570,7 +568,7 @@ class AnalysisDomain extends Domain {
   /// analysis root specified to analysis.setAnalysisRoots), an error of type
   /// `GET_ERRORS_INVALID_FILE` will be generated.
   Future<ErrorsResult> getErrors(String file) {
-    Map m = {'file': file};
+    final Map m = {'file': file};
     return _call('analysis.getErrors', m).then(ErrorsResult.parse);
   }
 
@@ -578,7 +576,7 @@ class AnalysisDomain extends Domain {
   /// all of the hover information is not available at the time this request is
   /// processed the information will be omitted from the response.
   Future<HoverResult> getHover(String file, int offset) {
-    Map m = {'file': file, 'offset': offset};
+    final Map m = {'file': file, 'offset': offset};
     return _call('analysis.getHover', m).then(HoverResult.parse);
   }
 
@@ -592,7 +590,7 @@ class AnalysisDomain extends Domain {
   @experimental
   Future<ImportedElementsResult> getImportedElements(
       String file, int offset, int length) {
-    Map m = {'file': file, 'offset': offset, 'length': length};
+    final Map m = {'file': file, 'offset': offset, 'length': length};
     return _call('analysis.getImportedElements', m)
         .then(ImportedElementsResult.parse);
   }
@@ -626,20 +624,36 @@ class AnalysisDomain extends Domain {
   /// analysis root specified to analysis.setAnalysisRoots), an error of type
   /// `GET_NAVIGATION_INVALID_FILE` will be generated.
   Future<NavigationResult> getNavigation(String file, int offset, int length) {
-    Map m = {'file': file, 'offset': offset, 'length': length};
+    final Map m = {'file': file, 'offset': offset, 'length': length};
     return _call('analysis.getNavigation', m).then(NavigationResult.parse);
   }
 
-  /// Return the transitive closure of reachable sources for a given file.
-  ///
-  /// If a request is made for a file which does not exist, or which is not
-  /// currently subject to analysis (e.g. because it is not associated with any
-  /// analysis root specified to analysis.setAnalysisRoots), an error of type
-  /// `GET_REACHABLE_SOURCES_INVALID_FILE` will be generated.
+  @deprecated
   Future<ReachableSourcesResult> getReachableSources(String file) {
-    Map m = {'file': file};
+    final Map m = {'file': file};
     return _call('analysis.getReachableSources', m)
         .then(ReachableSourcesResult.parse);
+  }
+
+  /// Return the signature information associated with the given location in the
+  /// given file. If the signature information for the given file has not yet
+  /// been computed, or the most recently computed signature information for the
+  /// given file is out of date, then the response for this request will be
+  /// delayed until it has been computed. If a request is made for a file which
+  /// does not exist, or which is not currently subject to analysis (e.g.
+  /// because it is not associated with any analysis root specified to
+  /// analysis.setAnalysisRoots), an error of type `GET_SIGNATURE_INVALID_FILE`
+  /// will be generated. If the location given is not inside the argument list
+  /// for a function (including method and constructor) invocation, then an
+  /// error of type `GET_SIGNATURE_INVALID_OFFSET` will be generated. If the
+  /// location is inside an argument list but the function is not defined or
+  /// cannot be determined (such as a method invocation where the target has
+  /// type 'dynamic') then an error of type `GET_SIGNATURE_UNKNOWN_FUNCTION`
+  /// will be generated.
+  @experimental
+  Future<SignatureResult> getSignature(String file, int offset) {
+    final Map m = {'file': file, 'offset': offset};
+    return _call('analysis.getSignature', m).then(SignatureResult.parse);
   }
 
   /// Force the re-analysis of everything contained in the specified analysis
@@ -653,7 +667,7 @@ class AnalysisDomain extends Domain {
   /// currently analysis roots, then an error of type `INVALID_ANALYSIS_ROOT`
   /// will be generated.
   Future reanalyze({List<String> roots}) {
-    Map m = {};
+    final Map m = {};
     if (roots != null) m['roots'] = roots;
     return _call('analysis.reanalyze', m);
   }
@@ -684,7 +698,7 @@ class AnalysisDomain extends Domain {
   /// it will be used to resolve package: URI’s within the file.
   Future setAnalysisRoots(List<String> included, List<String> excluded,
       {Map<String, String> packageRoots}) {
-    Map m = {'included': included, 'excluded': excluded};
+    final Map m = {'included': included, 'excluded': excluded};
     if (packageRoots != null) m['packageRoots'] = packageRoots;
     return _call('analysis.setAnalysisRoots', m);
   }
@@ -1091,6 +1105,33 @@ class ReachableSourcesResult {
   ReachableSourcesResult(this.sources);
 }
 
+class SignatureResult {
+  static SignatureResult parse(Map m) => new SignatureResult(
+      m['name'],
+      m['parameters'] == null
+          ? null
+          : new List.from(
+              m['parameters'].map((obj) => ParameterInfo.parse(obj))),
+      dartdoc: m['dartdoc']);
+
+  /// The name of the function being invoked at the given offset.
+  final String name;
+
+  /// A list of information about each of the parameters of the function being
+  /// invoked.
+  final List<ParameterInfo> parameters;
+
+  /// The dartdoc associated with the function being invoked. Other than the
+  /// removal of the comment delimiters, including leading asterisks in the case
+  /// of a block comment, the dartdoc is unprocessed markdown. This data is
+  /// omitted if there is no referenced element, or if the element has no
+  /// dartdoc.
+  @optional
+  final String dartdoc;
+
+  SignatureResult(this.name, this.parameters, {this.dartdoc});
+}
+
 // completion domain
 
 /// The code completion domain contains commands related to getting code
@@ -1108,7 +1149,7 @@ class CompletionDomain extends Domain {
   /// Request that completion suggestions for the given offset in the given file
   /// be returned.
   Future<SuggestionsResult> getSuggestions(String file, int offset) {
-    Map m = {'file': file, 'offset': offset};
+    final Map m = {'file': file, 'offset': offset};
     return _call('completion.getSuggestions', m).then(SuggestionsResult.parse);
   }
 }
@@ -1184,7 +1225,7 @@ class SearchDomain extends Domain {
   /// returned via the search.results notification as they become available.
   Future<FindElementReferencesResult> findElementReferences(
       String file, int offset, bool includePotential) {
-    Map m = {
+    final Map m = {
       'file': file,
       'offset': offset,
       'includePotential': includePotential
@@ -1199,7 +1240,7 @@ class SearchDomain extends Domain {
   /// An identifier is returned immediately, and individual results will be
   /// returned via the search.results notification as they become available.
   Future<FindMemberDeclarationsResult> findMemberDeclarations(String name) {
-    Map m = {'name': name};
+    final Map m = {'name': name};
     return _call('search.findMemberDeclarations', m)
         .then(FindMemberDeclarationsResult.parse);
   }
@@ -1212,7 +1253,7 @@ class SearchDomain extends Domain {
   /// An identifier is returned immediately, and individual results will be
   /// returned via the search.results notification as they become available.
   Future<FindMemberReferencesResult> findMemberReferences(String name) {
-    Map m = {'name': name};
+    final Map m = {'name': name};
     return _call('search.findMemberReferences', m)
         .then(FindMemberReferencesResult.parse);
   }
@@ -1225,7 +1266,7 @@ class SearchDomain extends Domain {
   /// returned via the search.results notification as they become available.
   Future<FindTopLevelDeclarationsResult> findTopLevelDeclarations(
       String pattern) {
-    Map m = {'pattern': pattern};
+    final Map m = {'pattern': pattern};
     return _call('search.findTopLevelDeclarations', m)
         .then(FindTopLevelDeclarationsResult.parse);
   }
@@ -1234,7 +1275,7 @@ class SearchDomain extends Domain {
   @experimental
   Future<ElementDeclarationsResult> getElementDeclarations(
       {String file, String pattern, int maxResults}) {
-    Map m = {};
+    final Map m = {};
     if (file != null) m['file'] = file;
     if (pattern != null) m['pattern'] = pattern;
     if (maxResults != null) m['maxResults'] = maxResults;
@@ -1246,7 +1287,7 @@ class SearchDomain extends Domain {
   /// location.
   Future<TypeHierarchyResult> getTypeHierarchy(String file, int offset,
       {bool superOnly}) {
-    Map m = {'file': file, 'offset': offset};
+    final Map m = {'file': file, 'offset': offset};
     if (superOnly != null) m['superOnly'] = superOnly;
     return _call('search.getTypeHierarchy', m).then(TypeHierarchyResult.parse);
   }
@@ -1388,7 +1429,7 @@ class EditDomain extends Domain {
   Future<FormatResult> format(
       String file, int selectionOffset, int selectionLength,
       {int lineLength}) {
-    Map m = {
+    final Map m = {
       'file': file,
       'selectionOffset': selectionOffset,
       'selectionLength': selectionLength
@@ -1402,7 +1443,7 @@ class EditDomain extends Domain {
   /// affects a single file and does not require user input in order to be
   /// performed.
   Future<AssistsResult> getAssists(String file, int offset, int length) {
-    Map m = {'file': file, 'offset': offset, 'length': length};
+    final Map m = {'file': file, 'offset': offset, 'length': length};
     return _call('edit.getAssists', m).then(AssistsResult.parse);
   }
 
@@ -1410,15 +1451,25 @@ class EditDomain extends Domain {
   /// selection in the given file.
   Future<AvailableRefactoringsResult> getAvailableRefactorings(
       String file, int offset, int length) {
-    Map m = {'file': file, 'offset': offset, 'length': length};
+    final Map m = {'file': file, 'offset': offset, 'length': length};
     return _call('edit.getAvailableRefactorings', m)
         .then(AvailableRefactoringsResult.parse);
+  }
+
+  /// Analyze the specified sources for recommended changes and return a set of
+  /// suggested edits for those sources. These edits may include changes to
+  /// sources outside the set of specified sources if a change in a specified
+  /// source requires it.
+  @experimental
+  Future<DartfixResult> dartfix(List<String> included) {
+    final Map m = {'included': included};
+    return _call('edit.dartfix', m).then(DartfixResult.parse);
   }
 
   /// Return the set of fixes that are available for the errors at a given
   /// offset in a given file.
   Future<FixesResult> getFixes(String file, int offset) {
-    Map m = {'file': file, 'offset': offset};
+    final Map m = {'file': file, 'offset': offset};
     return _call('edit.getFixes', m).then(FixesResult.parse);
   }
 
@@ -1427,7 +1478,7 @@ class EditDomain extends Domain {
   @experimental
   Future<PostfixCompletionResult> getPostfixCompletion(
       String file, String key, int offset) {
-    Map m = {'file': file, 'key': key, 'offset': offset};
+    final Map m = {'file': file, 'key': key, 'offset': offset};
     return _call('edit.getPostfixCompletion', m)
         .then(PostfixCompletionResult.parse);
   }
@@ -1439,7 +1490,7 @@ class EditDomain extends Domain {
   Future<RefactoringResult> getRefactoring(
       String kind, String file, int offset, int length, bool validateOnly,
       {RefactoringOptions options}) {
-    Map m = {
+    final Map m = {
       'kind': kind,
       'file': file,
       'offset': offset,
@@ -1461,7 +1512,7 @@ class EditDomain extends Domain {
   @experimental
   Future<StatementCompletionResult> getStatementCompletion(
       String file, int offset) {
-    Map m = {'file': file, 'offset': offset};
+    final Map m = {'file': file, 'offset': offset};
     return _call('edit.getStatementCompletion', m)
         .then(StatementCompletionResult.parse);
   }
@@ -1471,7 +1522,7 @@ class EditDomain extends Domain {
   @experimental
   Future<IsPostfixCompletionApplicableResult> isPostfixCompletionApplicable(
       String file, String key, int offset) {
-    Map m = {'file': file, 'key': key, 'offset': offset};
+    final Map m = {'file': file, 'key': key, 'offset': offset};
     return _call('edit.isPostfixCompletionApplicable', m)
         .then(IsPostfixCompletionApplicableResult.parse);
   }
@@ -1494,7 +1545,7 @@ class EditDomain extends Domain {
   @experimental
   Future<ImportElementsResult> importElements(
       String file, List<ImportedElements> elements) {
-    Map m = {'file': file, 'elements': elements};
+    final Map m = {'file': file, 'elements': elements};
     return _call('edit.importElements', m).then(ImportElementsResult.parse);
   }
 
@@ -1507,7 +1558,7 @@ class EditDomain extends Domain {
   /// If the Dart file has scan or parse errors, `SORT_MEMBERS_PARSE_ERRORS`
   /// will be generated.
   Future<SortMembersResult> sortMembers(String file) {
-    Map m = {'file': file};
+    final Map m = {'file': file};
     return _call('edit.sortMembers', m).then(SortMembersResult.parse);
   }
 
@@ -1523,7 +1574,7 @@ class EditDomain extends Domain {
   /// has scan or parse errors, or by other reasons, `ORGANIZE_DIRECTIVES_ERROR`
   /// will be generated. The message will provide details about the reason.
   Future<OrganizeDirectivesResult> organizeDirectives(String file) {
-    Map m = {'file': file};
+    final Map m = {'file': file};
     return _call('edit.organizeDirectives', m)
         .then(OrganizeDirectivesResult.parse);
   }
@@ -1570,6 +1621,37 @@ class AvailableRefactoringsResult {
   final List<String> kinds;
 
   AvailableRefactoringsResult(this.kinds);
+}
+
+class DartfixResult {
+  static DartfixResult parse(Map m) => new DartfixResult(
+      m['descriptionOfFixes'] == null
+          ? null
+          : new List.from(m['descriptionOfFixes']),
+      m['otherRecommendations'] == null
+          ? null
+          : new List.from(m['otherRecommendations']),
+      m['hasErrors'],
+      m['fixes'] == null
+          ? null
+          : new List.from(m['fixes'].map((obj) => SourceFileEdit.parse(obj))));
+
+  /// A list of human readable changes made by applying the fixes.
+  final List<String> descriptionOfFixes;
+
+  /// A list of human readable recommended changes that cannot be made
+  /// automatically.
+  final List<String> otherRecommendations;
+
+  /// True if the analyzed source contains errors that might impact the
+  /// correctness of the recommended fixes that can be automatically applied.
+  final bool hasErrors;
+
+  /// The suggested fixes.
+  final List<SourceFileEdit> fixes;
+
+  DartfixResult(this.descriptionOfFixes, this.otherRecommendations,
+      this.hasErrors, this.fixes);
 }
 
 class FixesResult {
@@ -1696,16 +1778,18 @@ class ListPostfixCompletionTemplatesResult {
 
 class ImportElementsResult {
   static ImportElementsResult parse(Map m) =>
-      new ImportElementsResult(SourceFileEdit.parse(m['edit']));
+      new ImportElementsResult(edit: SourceFileEdit.parse(m['edit']));
 
   /// The edits to be applied in order to make the specified elements
   /// accessible. The file to be edited will be the defining compilation unit of
   /// the library containing the file specified in the request, which can be
   /// different than the file specified in the request if the specified file is
-  /// a part file.
+  /// a part file. This field will be omitted if there are no edits that need to
+  /// be applied.
+  @optional
   final SourceFileEdit edit;
 
-  ImportElementsResult(this.edit);
+  ImportElementsResult({this.edit});
 }
 
 class SortMembersResult {
@@ -1751,7 +1835,7 @@ class ExecutionDomain extends Domain {
   /// used to delete it. Clients, therefore, are responsible for managing the
   /// lifetime of execution contexts.
   Future<CreateContextResult> createContext(String contextRoot) {
-    Map m = {'contextRoot': contextRoot};
+    final Map m = {'contextRoot': contextRoot};
     return _call('execution.createContext', m).then(CreateContextResult.parse);
   }
 
@@ -1760,6 +1844,39 @@ class ExecutionDomain extends Domain {
   /// when they are no longer valid.
   Future deleteContext(String id) =>
       _call('execution.deleteContext', {'id': id});
+
+  /// Request completion suggestions for the given runtime context.
+  ///
+  /// It might take one or two requests of this type to get completion
+  /// suggestions. The first request should have only "code", "offset", and
+  /// "variables", but not "expressions". If there are sub-expressions that can
+  /// have different runtime types, and are considered to be safe to evaluate at
+  /// runtime (e.g. getters), so using their actual runtime types can improve
+  /// completion results, the server will not include the "suggestions" field in
+  /// the response, and instead will return the "expressions" field. The client
+  /// will use debug API to get current runtime types for these sub-expressions
+  /// and send another request, this time with "expressions". If there are no
+  /// interesting sub-expressions to get runtime types for, or when the
+  /// "expressions" field is provided by the client, the server will return
+  /// "suggestions" in the response.
+  Future<RuntimeSuggestionsResult> getSuggestions(
+      String code,
+      int offset,
+      String contextFile,
+      int contextOffset,
+      List<RuntimeCompletionVariable> variables,
+      {List<RuntimeCompletionExpression> expressions}) {
+    final Map m = {
+      'code': code,
+      'offset': offset,
+      'contextFile': contextFile,
+      'contextOffset': contextOffset,
+      'variables': variables
+    };
+    if (expressions != null) m['expressions'] = expressions;
+    return _call('execution.getSuggestions', m)
+        .then(RuntimeSuggestionsResult.parse);
+  }
 
   /// Map a URI from the execution context to the file that it corresponds to,
   /// or map a file to the URI that it corresponds to in the execution context.
@@ -1781,7 +1898,7 @@ class ExecutionDomain extends Domain {
   /// If the contextRoot used to create the execution context does not exist,
   /// then an error of type `INVALID_EXECUTION_CONTEXT` will be generated.
   Future<MapUriResult> mapUri(String id, {String file, String uri}) {
-    Map m = {'id': id};
+    final Map m = {'id': id};
     if (file != null) m['file'] = file;
     if (uri != null) m['uri'] = uri;
     return _call('execution.mapUri', m).then(MapUriResult.parse);
@@ -1823,6 +1940,38 @@ class CreateContextResult {
   final String id;
 
   CreateContextResult(this.id);
+}
+
+class RuntimeSuggestionsResult {
+  static RuntimeSuggestionsResult parse(Map m) => new RuntimeSuggestionsResult(
+      suggestions: m['suggestions'] == null
+          ? null
+          : new List.from(
+              m['suggestions'].map((obj) => CompletionSuggestion.parse(obj))),
+      expressions: m['expressions'] == null
+          ? null
+          : new List.from(m['expressions']
+              .map((obj) => RuntimeCompletionExpression.parse(obj))));
+
+  /// The completion suggestions. In contrast to usual completion request,
+  /// suggestions for private elements also will be provided.
+  ///
+  /// If there are sub-expressions that can have different runtime types, and
+  /// are considered to be safe to evaluate at runtime (e.g. getters), so using
+  /// their actual runtime types can improve completion results, the server
+  /// omits this field in the response, and instead will return the
+  /// "expressions" field.
+  @optional
+  final List<CompletionSuggestion> suggestions;
+
+  /// The list of sub-expressions in the code for which the server would like to
+  /// know runtime types to provide better completion suggestions.
+  ///
+  /// This field is omitted the field "suggestions" is returned.
+  @optional
+  final List<RuntimeCompletionExpression> expressions;
+
+  RuntimeSuggestionsResult({this.suggestions, this.expressions});
 }
 
 class MapUriResult {
@@ -1953,7 +2102,7 @@ class AnalyticsDomain extends Domain {
   /// passed in using the `--client-id` command-line argument. The request will
   /// be ignored if the client id was not provided when server was started.
   Future sendTiming(String event, int millis) {
-    Map m = {'event': event, 'millis': millis};
+    final Map m = {'event': event, 'millis': millis};
     return _call('analytics.sendTiming', m);
   }
 }
@@ -1983,7 +2132,7 @@ class KytheDomain extends Domain {
   /// analysis root specified to analysis.setAnalysisRoots), an error of type
   /// `GET_KYTHE_ENTRIES_INVALID_FILE` will be generated.
   Future<KytheEntriesResult> getKytheEntries(String file) {
-    Map m = {'file': file};
+    final Map m = {'file': file};
     return _call('kythe.getKytheEntries', m).then(KytheEntriesResult.parse);
   }
 }
@@ -2027,7 +2176,7 @@ class FlutterDomain extends Domain {
   /// class at the given offset.
   Future<ChangeAddForDesignTimeConstructorResult>
       getChangeAddForDesignTimeConstructor(String file, int offset) {
-    Map m = {'file': file, 'offset': offset};
+    final Map m = {'file': file, 'offset': offset};
     return _call('flutter.getChangeAddForDesignTimeConstructor', m)
         .then(ChangeAddForDesignTimeConstructorResult.parse);
   }
@@ -2661,7 +2810,9 @@ class ElementDeclaration {
     if (m == null) return null;
     return new ElementDeclaration(m['name'], m['kind'], m['fileIndex'],
         m['offset'], m['line'], m['column'], m['codeOffset'], m['codeLength'],
-        className: m['className'], parameters: m['parameters']);
+        className: m['className'],
+        mixinName: m['mixinName'],
+        parameters: m['parameters']);
   }
 
   /// The name of the declaration.
@@ -2693,6 +2844,11 @@ class ElementDeclaration {
   @optional
   final String className;
 
+  /// The name of the mixin enclosing this declaration. If the declaration is
+  /// not a mixin member, this field will be absent.
+  @optional
+  final String mixinName;
+
   /// The parameter list for the element. If the element is not a method or
   /// function this field will not be defined. If the element doesn't have
   /// parameters (e.g. getter), this field will not be defined. If the element
@@ -2704,7 +2860,7 @@ class ElementDeclaration {
 
   ElementDeclaration(this.name, this.kind, this.fileIndex, this.offset,
       this.line, this.column, this.codeOffset, this.codeLength,
-      {this.className, this.parameters});
+      {this.className, this.mixinName, this.parameters});
 }
 
 /// A description of an executable file.
@@ -3349,6 +3505,7 @@ class Outline {
   static Outline parse(Map m) {
     if (m == null) return null;
     return new Outline(Element.parse(m['element']), m['offset'], m['length'],
+        m['codeOffset'], m['codeLength'],
         children: m['children'] == null
             ? null
             : new List.from(m['children'].map((obj) => Outline.parse(obj))));
@@ -3366,12 +3523,21 @@ class Outline {
   /// The length of the element.
   final int length;
 
+  /// The offset of the first character of the element code, which is neither
+  /// documentation, nor annotation.
+  final int codeOffset;
+
+  /// The length of the element code.
+  final int codeLength;
+
   /// The children of the node. The field will be omitted if the node has no
-  /// children.
+  /// children. Children are sorted by offset.
   @optional
   final List<Outline> children;
 
-  Outline(this.element, this.offset, this.length, {this.children});
+  Outline(
+      this.element, this.offset, this.length, this.codeOffset, this.codeLength,
+      {this.children});
 }
 
 /// A description of a member that is being overridden.
@@ -3422,6 +3588,32 @@ class Override {
 
   Override(this.offset, this.length,
       {this.superclassMember, this.interfaceMembers});
+}
+
+/// A description of a member that is being overridden.
+@experimental
+class ParameterInfo {
+  static ParameterInfo parse(Map m) {
+    if (m == null) return null;
+    return new ParameterInfo(m['kind'], m['name'], m['type'],
+        defaultValue: m['defaultValue']);
+  }
+
+  /// The kind of the parameter.
+  final String kind;
+
+  /// The name of the parameter.
+  final String name;
+
+  /// The type of the parameter.
+  final String type;
+
+  /// The default value for this parameter. This value will be omitted if the
+  /// parameter does not have a default value.
+  @optional
+  final String defaultValue;
+
+  ParameterInfo(this.kind, this.name, this.type, {this.defaultValue});
 }
 
 /// A position within a file.
@@ -3550,6 +3742,122 @@ class RemoveContentOverlay extends ContentOverlayType implements Jsonable {
   RemoveContentOverlay() : super('remove');
 
   Map toMap() => _stripNullValues({'type': type});
+}
+
+/// An expression for which we want to know its runtime type. In expressions
+/// like `a.b.c.where((e) => e.^)` we want to know the runtime type of `a.b.c`
+/// to enforce it statically at the time when we compute completion suggestions,
+/// and get better type for `e`.
+class RuntimeCompletionExpression implements Jsonable {
+  static RuntimeCompletionExpression parse(Map m) {
+    if (m == null) return null;
+    return new RuntimeCompletionExpression(m['offset'], m['length'],
+        type: RuntimeCompletionExpressionType.parse(m['type']));
+  }
+
+  /// The offset of the expression in the code for completion.
+  final int offset;
+
+  /// The length of the expression in the code for completion.
+  final int length;
+
+  /// When the expression is sent from the server to the client, the type is
+  /// omitted. The client should fill the type when it sends the request to the
+  /// server again.
+  @optional
+  final RuntimeCompletionExpressionType type;
+
+  RuntimeCompletionExpression(this.offset, this.length, {this.type});
+
+  Map toMap() =>
+      _stripNullValues({'offset': offset, 'length': length, 'type': type});
+}
+
+/// A type at runtime.
+class RuntimeCompletionExpressionType {
+  static RuntimeCompletionExpressionType parse(Map m) {
+    if (m == null) return null;
+    return new RuntimeCompletionExpressionType(m['kind'],
+        libraryPath: m['libraryPath'],
+        name: m['name'],
+        typeArguments: m['typeArguments'] == null
+            ? null
+            : new List.from(m['typeArguments']
+                .map((obj) => RuntimeCompletionExpressionType.parse(obj))),
+        returnType: RuntimeCompletionExpressionType.parse(m['returnType']),
+        parameterTypes: m['parameterTypes'] == null
+            ? null
+            : new List.from(m['parameterTypes']
+                .map((obj) => RuntimeCompletionExpressionType.parse(obj))),
+        parameterNames: m['parameterNames'] == null
+            ? null
+            : new List.from(m['parameterNames']));
+  }
+
+  /// The kind of the type.
+  final String kind;
+
+  /// The path of the library that has this type. Omitted if the type is not
+  /// declared in any library, e.g. "dynamic", or "void".
+  @optional
+  final String libraryPath;
+
+  /// The name of the type. Omitted if the type does not have a name, e.g. an
+  /// inline function type.
+  @optional
+  final String name;
+
+  /// The type arguments of the type. Omitted if the type does not have type
+  /// parameters.
+  @optional
+  final List<RuntimeCompletionExpressionType> typeArguments;
+
+  /// If the type is a function type, the return type of the function. Omitted
+  /// if the type is not a function type.
+  @optional
+  final RuntimeCompletionExpressionType returnType;
+
+  /// If the type is a function type, the types of the function parameters of
+  /// all kinds - required, optional positional, and optional named. Omitted if
+  /// the type is not a function type.
+  @optional
+  final List<RuntimeCompletionExpressionType> parameterTypes;
+
+  /// If the type is a function type, the names of the function parameters of
+  /// all kinds - required, optional positional, and optional named. The names
+  /// of positional parameters are empty strings. Omitted if the type is not a
+  /// function type.
+  @optional
+  final List<String> parameterNames;
+
+  RuntimeCompletionExpressionType(this.kind,
+      {this.libraryPath,
+      this.name,
+      this.typeArguments,
+      this.returnType,
+      this.parameterTypes,
+      this.parameterNames});
+}
+
+/// A variable in a runtime context.
+class RuntimeCompletionVariable implements Jsonable {
+  static RuntimeCompletionVariable parse(Map m) {
+    if (m == null) return null;
+    return new RuntimeCompletionVariable(
+        m['name'], RuntimeCompletionExpressionType.parse(m['type']));
+  }
+
+  /// The name of the variable. The name "this" has a special meaning and is
+  /// used as an implicit target for runtime completion, and in explicit "this"
+  /// references.
+  final String name;
+
+  /// The type of the variable.
+  final RuntimeCompletionExpressionType type;
+
+  RuntimeCompletionVariable(this.name, this.type);
+
+  Map toMap() => _stripNullValues({'name': name, 'type': type});
 }
 
 /// A single result from a search request.

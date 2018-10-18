@@ -7,7 +7,7 @@
 <body>
 <h1>Analysis Server API Specification</h1>
 <h1 style="color:#999999">Version
-  <version>1.20.0</version>
+  <version>1.21.0</version>
 </h1>
 <p>
   This document contains a specification of the API provided by the
@@ -332,12 +332,17 @@
           analyzed.
         </p>
       </field>
-      <field name="pub" optional="true">
+      <field name="pub" optional="true" deprecated="true">
         <ref>PubStatus</ref>
         <p>
           The current status of pub execution, indicating whether we are
           currently running pub.
         </p>
+
+        <p>
+          Note: this status type is deprecated, and is no longer sent by
+          the server.
+      </p>
       </field>
     </params>
   </notification>
@@ -600,7 +605,7 @@
       </field>
     </result>
   </request>
-  <request method="getReachableSources">
+  <request method="getReachableSources" deprecated="true">
     <p>
       Return the transitive closure of reachable sources for a given file.
     </p>
@@ -643,6 +648,67 @@
           To check if a specific URI is reachable from a given file, clients can
           check
           for its presence in the resulting key set.
+        </p>
+      </field>
+    </result>
+  </request>
+  <request method="getSignature" experimental="true">
+    <p>
+      Return the signature information associated with the given
+      location in the given file. If the signature information
+      for the given file has not yet been computed, or the most
+      recently computed signature information for the given file
+      is out of date, then the response for this request will be
+      delayed until it has been computed.
+
+      If a request is made for a file which does not exist, or
+      which is not currently subject to analysis (e.g. because it
+      is not associated with any analysis root specified to
+      analysis.setAnalysisRoots), an error of type
+      <tt>GET_SIGNATURE_INVALID_FILE</tt> will be generated.
+
+      If the location given is not inside the argument list for a
+      function (including method and constructor) invocation, then
+      an error of type <tt>GET_SIGNATURE_INVALID_OFFSET</tt> will
+      be generated. If the location is inside an argument list but
+      the function is not defined or cannot be determined (such as
+      a method invocation where the target has type 'dynamic')
+      then an error of type <tt>GET_SIGNATURE_UNKNOWN_FUNCTION</tt>
+      will be generated.
+    </p>
+    <params>
+      <field name="file">
+        <ref>FilePath</ref>
+        <p>
+          The file in which signature information is being requested.
+        </p>
+      </field>
+      <field name="offset">
+        <ref>int</ref>
+        <p>
+          The location for which signature information is being requested.
+        </p>
+      </field>
+    </params>
+    <result>
+      <field name="name">
+        <ref>String</ref>
+        <p>The name of the function being invoked at the given offset.</p>
+      </field>
+      <field name="parameters">
+        <list>
+          <ref>ParameterInfo</ref>
+        </list>
+        <p>A list of information about each of the parameters of the function being invoked.</p>
+      </field>
+      <field name="dartdoc" optional="true">
+        <ref>String</ref>
+        <p>
+          The dartdoc associated with the function being invoked. Other
+          than the removal of the comment delimiters, including leading
+          asterisks in the case of a block comment, the dartdoc is
+          unprocessed markdown. This data is omitted if there is no
+          referenced element, or if the element has no dartdoc.
         </p>
       </field>
     </result>
@@ -1867,6 +1933,64 @@
       </field>
     </result>
   </request>
+  <request method="dartfix" experimental="true">
+    <p>
+      Analyze the specified sources for recommended changes
+      and return a set of suggested edits for those sources.
+      These edits may include changes to sources outside the set
+      of specified sources if a change in a specified source requires it.
+    </p>
+    <params>
+      <field name="included">
+        <list>
+          <ref>FilePath</ref>
+        </list>
+        <p>
+          A list of the files and directories for which edits should be suggested.
+        </p>
+        <p>
+          If a request is made with a path that is invalid, e.g. is not absolute and normalized,
+          an error of type <tt>INVALID_FILE_PATH_FORMAT</tt> will be generated.
+          If a request is made for a file which does not exist, or which is not currently subject to analysis
+          (e.g. because it is not associated with any analysis root specified to analysis.setAnalysisRoots),
+          an error of type <tt>FILE_NOT_ANALYZED</tt> will be generated.
+        </p>
+      </field>
+    </params>
+    <result>
+      <field name="descriptionOfFixes">
+        <list>
+          <ref>String</ref>
+        </list>
+        <p>
+          A list of human readable changes made by applying the fixes.
+        </p>
+      </field>
+      <field name="otherRecommendations">
+        <list>
+          <ref>String</ref>
+        </list>
+        <p>
+          A list of human readable recommended changes that cannot be made automatically.
+        </p>
+      </field>
+      <field name="hasErrors">
+        <ref>bool</ref>
+        <p>
+          True if the analyzed source contains errors that might impact the correctness
+          of the recommended fixes that can be automatically applied.
+        </p>
+      </field>
+      <field name="fixes">
+        <list>
+          <ref>SourceFileEdit</ref>
+        </list>
+        <p>
+          The suggested fixes.
+        </p>
+      </field>
+    </result>
+  </request>
   <request method="getFixes">
     <p>
       Return the set of fixes that are available for the errors at
@@ -2180,14 +2304,13 @@
       </field>
     </params>
     <result>
-      <field name="edit">
+      <field name="edit" optional="true">
         <ref>SourceFileEdit</ref>
         <p>
-          The edits to be applied in order to make the specified elements
-          accessible. The file to be edited will be the defining compilation
-          unit of the library containing the file specified in the request,
-          which can be different than the file specified in the request if the
-          specified file is a part file.
+          The edits to be applied in order to make the specified elements accessible. The file to be edited will be the
+          defining compilation unit of the library containing the file specified in the request, which can be different
+          than the file specified in the request if the specified file is a part file. This field will be omitted if
+          there are no edits that need to be applied.
         </p>
       </field>
     </result>
@@ -2306,6 +2429,111 @@
         </p>
       </field>
     </params>
+  </request>
+  <request method="getSuggestions">
+    <p>
+      Request completion suggestions for the given runtime context.
+    </p>
+    <p>
+      It might take one or two requests of this type to get completion
+      suggestions. The first request should have only "code", "offset",
+      and "variables", but not "expressions". If there are sub-expressions that
+      can have different runtime types, and are considered to be safe to
+      evaluate at runtime (e.g. getters), so using their actual runtime types
+      can improve completion results, the server will not include the
+      "suggestions" field in the response, and instead will return the
+      "expressions" field. The client will use debug API to get current runtime
+      types for these sub-expressions and send another request, this time with
+      "expressions". If there are no interesting sub-expressions to get
+      runtime types for, or when the "expressions" field is provided by the
+      client, the server will return "suggestions" in the response.
+    </p>
+    <params>
+      <field name="code">
+        <ref>String</ref>
+        <p>
+          The code to get suggestions in.
+        </p>
+      </field>
+      <field name="offset">
+        <ref>int</ref>
+        <p>
+          The offset within the code to get suggestions at.
+        </p>
+      </field>
+      <field name="contextFile">
+        <ref>FilePath</ref>
+        <p>
+          The path of the context file, e.g. the file of the current debugger
+          frame. The combination of the context file and context offset can
+          be used to ensure that all variables of the context are available
+          for completion (with their static types).
+        </p>
+      </field>
+      <field name="contextOffset">
+        <ref>int</ref>
+        <p>
+          The offset in the context file, e.g. the line offset in the current
+          debugger frame.
+        </p>
+      </field>
+      <field name="variables">
+        <list>
+          <ref>RuntimeCompletionVariable</ref>
+        </list>
+        <p>
+          The runtime context variables that are potentially referenced in the
+          code.
+        </p>
+      </field>
+      <field name="expressions" optional="true">
+        <list>
+          <ref>RuntimeCompletionExpression</ref>
+        </list>
+        <p>
+          The list of sub-expressions in the code for which the client wants
+          to provide runtime types. It does not have to be the full list of
+          expressions requested by the server, for missing expressions their
+          static types will be used.
+        </p>
+        <p>
+          When this field is omitted, the server will return completion
+          suggestions only when there are no interesting sub-expressions in the
+          given code. The client may provide an empty list, in this case the
+          server will return completion suggestions.
+        </p>
+      </field>
+    </params>
+    <result>
+      <field name="suggestions" optional="true">
+        <list>
+          <ref>CompletionSuggestion</ref>
+        </list>
+        <p>
+          The completion suggestions. In contrast to usual completion request,
+          suggestions for private elements also will be provided.
+        </p>
+        <p>
+          If there are sub-expressions that can have different runtime types,
+          and are considered to be safe to evaluate at runtime (e.g. getters),
+          so using their actual runtime types can improve completion results,
+          the server omits this field in the response, and instead will return
+          the "expressions" field.
+        </p>
+      </field>
+      <field name="expressions" optional="true">
+        <list>
+          <ref>RuntimeCompletionExpression</ref>
+        </list>
+        <p>
+          The list of sub-expressions in the code for which the server would
+          like to know runtime types to provide better completion suggestions.
+        </p>
+        <p>
+          This field is omitted the field "suggestions" is returned.
+        </p>
+      </field>
+    </result>
   </request>
   <request method="mapUri">
     <p>
@@ -3025,6 +3253,13 @@
           is not a class member, this field will be absent.
         </p>
       </field>
+      <field name="mixinName" optional="true">
+        <ref>String</ref>
+        <p>
+          The name of the mixin enclosing this declaration. If the declaration
+          is not a mixin member, this field will be absent.
+        </p>
+      </field>
       <field name="parameters" optional="true">
         <ref>String</ref>
         <p>
@@ -3074,6 +3309,132 @@
     <p>
       The identifier for a execution context.
     </p>
+  </type>
+  <type name="RuntimeCompletionExpression">
+    <p>
+      An expression for which we want to know its runtime type.
+      In expressions like `a.b.c.where((e) => e.^)` we want to know the
+      runtime type of `a.b.c` to enforce it statically at the time when we
+      compute completion suggestions, and get better type for `e`.
+    </p>
+    <object>
+      <field name="offset">
+        <ref>int</ref>
+        <p>
+          The offset of the expression in the code for completion.
+        </p>
+      </field>
+      <field name="length">
+        <ref>int</ref>
+        <p>
+          The length of the expression in the code for completion.
+        </p>
+      </field>
+      <field name="type" optional="true">
+        <ref>RuntimeCompletionExpressionType</ref>
+        <p>
+          When the expression is sent from the server to the client, the
+          type is omitted. The client should fill the type when it sends the
+          request to the server again.
+        </p>
+      </field>
+    </object>
+  </type>
+  <type name="RuntimeCompletionVariable">
+    <p>
+      A variable in a runtime context.
+    </p>
+    <object>
+      <field name="name">
+        <ref>String</ref>
+        <p>
+          The name of the variable.
+          The name "this" has a special meaning and is used as an implicit
+          target for runtime completion, and in explicit "this" references.
+        </p>
+      </field>
+      <field name="type">
+        <ref>RuntimeCompletionExpressionType</ref>
+        <p>
+          The type of the variable.
+        </p>
+      </field>
+    </object>
+  </type>
+  <type name="RuntimeCompletionExpressionType">
+    <p>
+      A type at runtime.
+    </p>
+    <object>
+      <field name="libraryPath" optional="true">
+        <ref>FilePath</ref>
+        <p>
+          The path of the library that has this type.
+          Omitted if the type is not declared in any library, e.g. "dynamic",
+          or "void".
+        </p>
+      </field>
+      <field name="kind">
+        <ref>RuntimeCompletionExpressionTypeKind</ref>
+        <p>
+          The kind of the type.
+        </p>
+      </field>
+      <field name="name" optional="true">
+        <ref>String</ref>
+        <p>
+          The name of the type. Omitted if the type does not have a name, e.g.
+          an inline function type.
+        </p>
+      </field>
+      <field name="typeArguments" optional="true">
+        <list>
+          <ref>RuntimeCompletionExpressionType</ref>
+        </list>
+        <p>
+          The type arguments of the type.
+          Omitted if the type does not have type parameters.
+        </p>
+      </field>
+      <field name="returnType" optional="true">
+        <ref>RuntimeCompletionExpressionType</ref>
+        <p>
+          If the type is a function type, the return type of the function.
+          Omitted if the type is not a function type.
+        </p>
+      </field>
+      <field name="parameterTypes" optional="true">
+        <list>
+          <ref>RuntimeCompletionExpressionType</ref>
+        </list>
+        <p>
+          If the type is a function type, the types of the function parameters
+          of all kinds - required, optional positional, and optional named.
+          Omitted if the type is not a function type.
+        </p>
+      </field>
+      <field name="parameterNames" optional="true">
+        <list>
+          <ref>String</ref>
+        </list>
+        <p>
+          If the type is a function type, the names of the function parameters
+          of all kinds - required, optional positional, and optional named.
+          The names of positional parameters are empty strings.
+          Omitted if the type is not a function type.
+        </p>
+      </field>
+    </object>
+  </type>
+  <type name="RuntimeCompletionExpressionTypeKind">
+    <p>
+      An enumeration of the kinds of runtime expression types.
+    </p>
+    <enum>
+      <value><code>DYNAMIC</code></value>
+      <value><code>FUNCTION</code></value>
+      <value><code>INTERFACE</code></value>
+    </enum>
   </type>
   <type name="ExecutionService">
     <p>
@@ -3723,6 +4084,29 @@
         </p>
       </value>
       <value>
+        <code>GET_SIGNATURE_INVALID_FILE</code>
+        <p>
+          An "analysis.getSignature" request specified a FilePath
+          which does not match a file currently subject to
+          analysis.
+        </p>
+      </value>
+      <value>
+        <code>GET_SIGNATURE_INVALID_OFFSET</code>
+        <p>
+          An "analysis.getSignature" request specified an offset
+          which is not a valid location within for the contents of
+          the file specified FilePath.
+        </p>
+      </value>
+      <value>
+        <code>GET_SIGNATURE_UNKNOWN_FUNCTION</code>
+        <p>
+          An "analysis.getSignature" request specified an offset
+          that could not be matched to a function call.
+        </p>
+      </value>
+      <value>
         <code>IMPORT_ELEMENTS_INVALID_FILE</code>
         <p>
           An "edit.importElements" request specified a FilePath that does not
@@ -3819,31 +4203,11 @@
         </p>
       </value>
       <value>
-        <code>UNANALYZED_PRIORITY_FILES</code>
-        <p>
-          An "analysis.setPriorityFiles" request includes one or
-          more files that are not being analyzed.
-        </p>
-        <p>
-          This is a legacy error; it will be removed before the
-          API reaches version 1.0.
-        </p>
-        <!-- TODO(paulberry): remove this error and the code that
-                 generates it. -->
-      </value>
-      <value>
         <code>UNKNOWN_REQUEST</code>
         <p>
           A request was received which the analysis server does
           not recognize, or cannot handle in its current
           configuration.
-        </p>
-      </value>
-      <value>
-        <code>UNKNOWN_SOURCE</code>
-        <p>
-          The analysis server was requested to perform an action
-          on a source that does not exist.
         </p>
       </value>
       <value>
