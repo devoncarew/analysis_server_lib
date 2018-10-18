@@ -454,7 +454,7 @@ class Request {
           .where((arg) => !arg.optional)
           .map((arg) => "'${arg.name}': ${arg.name}")
           .join(', ');
-      gen.writeStatement('Map m = {${mapStr}};');
+      gen.writeStatement('final Map m = {${mapStr}};');
       for (Field arg in args.where((arg) => arg.optional)) {
         gen.writeStatement(
             "if (${arg.name} != null) m['${arg.name}'] = ${arg.name};");
@@ -474,6 +474,7 @@ class Request {
 
   String get resultName {
     if (results.isEmpty) return 'dynamic';
+    if (domain.name == 'execution' && method == 'getSuggestions') return 'RuntimeSuggestionsResult';
     if (method.startsWith('get')) return '${method.substring(3)}Result';
     return '${titleCase(method)}Result';
   }
@@ -1156,7 +1157,7 @@ final String _serverCode = r'''
     String id = '${++_id}';
     _completers[id] = new Completer<Map>();
     _methodNames[id] = method;
-    Map m = {'id': id, 'method': method};
+    final Map m = {'id': id, 'method': method};
     if (args != null) m['params'] = args;
     String message = _jsonEncoder.encode(m);
     if (_willSend != null) _willSend(method);

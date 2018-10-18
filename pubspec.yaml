@@ -1,7 +1,7 @@
 name: analysis_server_lib
 description: A library to access Dart's analysis server API.
 
-version: 0.1.4+2
+version: 0.1.5
 author: Devon Carew <devoncarew@google.com>
 homepage: https://github.com/devoncarew/analysis_server_lib
 
