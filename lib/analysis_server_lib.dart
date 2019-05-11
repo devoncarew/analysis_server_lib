@@ -24,7 +24,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.21.0';
+const String generatedProtocolVersion = '1.26.1';
 
 typedef void MethodSend(String methodName);
 
@@ -656,21 +656,10 @@ class AnalysisDomain extends Domain {
     return _call('analysis.getSignature', m).then(SignatureResult.parse);
   }
 
-  /// Force the re-analysis of everything contained in the specified analysis
-  /// roots. This will cause all previously computed analysis results to be
-  /// discarded and recomputed, and will cause all subscribed notifications to
-  /// be re-sent.
-  ///
-  /// If no analysis roots are provided, then all current analysis roots will be
-  /// re-analyzed. If an empty list of analysis roots is provided, then nothing
-  /// will be re-analyzed. If the list contains one or more paths that are not
-  /// currently analysis roots, then an error of type `INVALID_ANALYSIS_ROOT`
-  /// will be generated.
-  Future reanalyze({List<String> roots}) {
-    final Map m = {};
-    if (roots != null) m['roots'] = roots;
-    return _call('analysis.reanalyze', m);
-  }
+  /// Force re-reading of all potentially changed files, re-resolving of all
+  /// referenced URIs, and corresponding re-analysis of everything affected in
+  /// the current analysis roots.
+  Future reanalyze() => _call('analysis.reanalyze');
 
   /// Sets the root paths used to determine which files to analyze. The set of
   /// files to be analyzed are all of the files in one of the root paths that
@@ -1146,11 +1135,65 @@ class CompletionDomain extends Domain {
     return _listen('completion.results', CompletionResults.parse);
   }
 
+  /// Reports the pre-computed, candidate completions from symbols defined in a
+  /// corresponding library. This notification may be sent multiple times. When
+  /// a notification is processed, clients should replace any previous
+  /// information about the libraries in the list of changedLibraries, discard
+  /// any information about the libraries in the list of removedLibraries, and
+  /// preserve any previously received information about any libraries that are
+  /// not included in either list.
+  Stream<CompletionAvailableSuggestions> get onAvailableSuggestions {
+    return _listen('completion.availableSuggestions',
+        CompletionAvailableSuggestions.parse);
+  }
+
   /// Request that completion suggestions for the given offset in the given file
   /// be returned.
   Future<SuggestionsResult> getSuggestions(String file, int offset) {
     final Map m = {'file': file, 'offset': offset};
     return _call('completion.getSuggestions', m).then(SuggestionsResult.parse);
+  }
+
+  /// Subscribe for completion services. All previous subscriptions are replaced
+  /// by the given set of services.
+  ///
+  /// It is an error if any of the elements in the list are not valid services.
+  /// If there is an error, then the current subscriptions will remain
+  /// unchanged.
+  Future setSubscriptions(List<String> subscriptions) =>
+      _call('completion.setSubscriptions', {'subscriptions': subscriptions});
+
+  /// The client can make this request to express interest in certain libraries
+  /// to receive completion suggestions from based on the client path. If this
+  /// request is received before the client has used
+  /// 'completion.setSubscriptions' to subscribe to the
+  /// `AVAILABLE_SUGGESTION_SETS` service, then an error of type
+  /// `NOT_SUBSCRIBED_TO_AVAILABLE_SUGGESTION_SETS` will be generated. All
+  /// previous paths are replaced by the given set of paths.
+  Future registerLibraryPaths(List<LibraryPathSet> paths) =>
+      _call('completion.registerLibraryPaths', {'paths': paths});
+
+  /// Clients must make this request when the user has selected a completion
+  /// suggestion from an `AvailableSuggestionSet`. Analysis server will respond
+  /// with the text to insert as well as any `SourceChange` that needs to be
+  /// applied in case the completion requires an additional import to be added.
+  /// It is an error if the id is no longer valid, for instance if the library
+  /// has been removed after the completion suggestion is accepted.
+  Future<SuggestionDetailsResult> getSuggestionDetails(
+      String file, int id, String label, int offset) {
+    final Map m = {'file': file, 'id': id, 'label': label, 'offset': offset};
+    return _call('completion.getSuggestionDetails', m)
+        .then(SuggestionDetailsResult.parse);
+  }
+
+  /// Inspect analysis server's knowledge about all of a file's tokens including
+  /// their lexeme, type, and what element kinds would have been appropriate for
+  /// the token's program location.
+  @experimental
+  Future<ListTokenDetailsResult> listTokenDetails(String file) {
+    final Map m = {'file': file};
+    return _call('completion.listTokenDetails', m)
+        .then(ListTokenDetailsResult.parse);
   }
 }
 
@@ -1163,7 +1206,18 @@ class CompletionResults {
           ? null
           : new List.from(
               m['results'].map((obj) => CompletionSuggestion.parse(obj))),
-      m['isLast']);
+      m['isLast'],
+      includedSuggestionSets: m['includedSuggestionSets'] == null
+          ? null
+          : new List.from(m['includedSuggestionSets']
+              .map((obj) => IncludedSuggestionSet.parse(obj))),
+      includedElementKinds: m['includedElementKinds'] == null
+          ? null
+          : new List.from(m['includedElementKinds']),
+      includedSuggestionRelevanceTags: m['includedSuggestionRelevanceTags'] ==
+              null
+          ? null
+          : new List.from(m['includedSuggestionRelevanceTags'].map((obj) => IncludedSuggestionRelevanceTag.parse(obj))));
 
   /// The id associated with the completion.
   final String id;
@@ -1190,8 +1244,58 @@ class CompletionResults {
   /// indicated completion.
   final bool isLast;
 
+  /// References to `AvailableSuggestionSet` objects previously sent to the
+  /// client. The client can include applicable names from the referenced
+  /// library in code completion suggestions.
+  @optional
+  final List<IncludedSuggestionSet> includedSuggestionSets;
+
+  /// The client is expected to check this list against the `ElementKind` sent
+  /// in `IncludedSuggestionSet` to decide whether or not these symbols should
+  /// should be presented to the user.
+  @optional
+  final List<String> includedElementKinds;
+
+  /// The client is expected to check this list against the values of the field
+  /// `relevanceTags` of `AvailableSuggestion` to decide if the suggestion
+  /// should be given a different relevance than the `IncludedSuggestionSet`
+  /// that contains it. This might be used for example to give higher relevance
+  /// to suggestions of matching types.
+  ///
+  /// If an `AvailableSuggestion` has relevance tags that match more than one
+  /// `IncludedSuggestionRelevanceTag`, the maximum relevance boost is used.
+  @optional
+  final List<IncludedSuggestionRelevanceTag> includedSuggestionRelevanceTags;
+
   CompletionResults(this.id, this.replacementOffset, this.replacementLength,
-      this.results, this.isLast);
+      this.results, this.isLast,
+      {this.includedSuggestionSets,
+      this.includedElementKinds,
+      this.includedSuggestionRelevanceTags});
+}
+
+class CompletionAvailableSuggestions {
+  static CompletionAvailableSuggestions parse(Map m) =>
+      new CompletionAvailableSuggestions(
+          changedLibraries: m['changedLibraries'] == null
+              ? null
+              : new List.from(m['changedLibraries']
+                  .map((obj) => AvailableSuggestionSet.parse(obj))),
+          removedLibraries: m['removedLibraries'] == null
+              ? null
+              : new List.from(m['removedLibraries']));
+
+  /// A list of pre-computed, potential completions coming from this set of
+  /// completion suggestions.
+  @optional
+  final List<AvailableSuggestionSet> changedLibraries;
+
+  /// A list of library ids that no longer apply.
+  @optional
+  final List<int> removedLibraries;
+
+  CompletionAvailableSuggestions(
+      {this.changedLibraries, this.removedLibraries});
 }
 
 class SuggestionsResult {
@@ -1201,6 +1305,36 @@ class SuggestionsResult {
   final String id;
 
   SuggestionsResult(this.id);
+}
+
+class SuggestionDetailsResult {
+  static SuggestionDetailsResult parse(Map m) =>
+      new SuggestionDetailsResult(m['completion'],
+          change: SourceChange.parse(m['change']));
+
+  /// The full text to insert, including any optional import prefix.
+  final String completion;
+
+  /// A change for the client to apply in case the library containing the
+  /// accepted completion suggestion needs to be imported. The field will be
+  /// omitted if there are no additional changes that need to be made.
+  @optional
+  final SourceChange change;
+
+  SuggestionDetailsResult(this.completion, {this.change});
+}
+
+class ListTokenDetailsResult {
+  static ListTokenDetailsResult parse(Map m) =>
+      new ListTokenDetailsResult(m['tokens'] == null
+          ? null
+          : new List.from(m['tokens'].map((obj) => TokenDetails.parse(obj))));
+
+  /// A list of the file's scanned tokens including analysis information about
+  /// them.
+  final List<TokenDetails> tokens;
+
+  ListTokenDetailsResult(this.tokens);
 }
 
 // search domain
@@ -1456,13 +1590,34 @@ class EditDomain extends Domain {
         .then(AvailableRefactoringsResult.parse);
   }
 
+  /// Request information about edit.dartfix such as the list of known fixes
+  /// that can be specified in an edit.dartfix request.
+  @experimental
+  Future<DartfixInfoResult> getDartfixInfo() =>
+      _call('edit.getDartfixInfo').then(DartfixInfoResult.parse);
+
   /// Analyze the specified sources for recommended changes and return a set of
   /// suggested edits for those sources. These edits may include changes to
   /// sources outside the set of specified sources if a change in a specified
   /// source requires it.
+  ///
+  /// If includedFixes is specified, then those fixes will be applied. If
+  /// includeRequiredFixes is specified, then "required" fixes will be applied
+  /// in addition to whatever fixes are specified in includedFixes if any. If
+  /// neither includedFixes nor includeRequiredFixes is specified, then all
+  /// fixes will be applied. If excludedFixes is specified, then those fixes
+  /// will not be applied regardless of whether they are "required" or specified
+  /// in includedFixes.
   @experimental
-  Future<DartfixResult> dartfix(List<String> included) {
+  Future<DartfixResult> dartfix(List<String> included,
+      {List<String> includedFixes,
+      bool includeRequiredFixes,
+      List<String> excludedFixes}) {
     final Map m = {'included': included};
+    if (includedFixes != null) m['includedFixes'] = includedFixes;
+    if (includeRequiredFixes != null)
+      m['includeRequiredFixes'] = includeRequiredFixes;
+    if (excludedFixes != null) m['excludedFixes'] = excludedFixes;
     return _call('edit.dartfix', m).then(DartfixResult.parse);
   }
 
@@ -1544,8 +1699,10 @@ class EditDomain extends Domain {
   /// `IMPORT_ELEMENTS_INVALID_FILE` will be generated.
   @experimental
   Future<ImportElementsResult> importElements(
-      String file, List<ImportedElements> elements) {
+      String file, List<ImportedElements> elements,
+      {int offset}) {
     final Map m = {'file': file, 'elements': elements};
+    if (offset != null) m['offset'] = offset;
     return _call('edit.importElements', m).then(ImportElementsResult.parse);
   }
 
@@ -1623,35 +1780,49 @@ class AvailableRefactoringsResult {
   AvailableRefactoringsResult(this.kinds);
 }
 
+class DartfixInfoResult {
+  static DartfixInfoResult parse(Map m) =>
+      new DartfixInfoResult(m['fixes'] == null
+          ? null
+          : new List.from(m['fixes'].map((obj) => DartFix.parse(obj))));
+
+  /// A list of fixes that can be specified in an edit.dartfix request.
+  final List<DartFix> fixes;
+
+  DartfixInfoResult(this.fixes);
+}
+
 class DartfixResult {
   static DartfixResult parse(Map m) => new DartfixResult(
-      m['descriptionOfFixes'] == null
+      m['suggestions'] == null
           ? null
-          : new List.from(m['descriptionOfFixes']),
-      m['otherRecommendations'] == null
+          : new List.from(
+              m['suggestions'].map((obj) => DartFixSuggestion.parse(obj))),
+      m['otherSuggestions'] == null
           ? null
-          : new List.from(m['otherRecommendations']),
+          : new List.from(
+              m['otherSuggestions'].map((obj) => DartFixSuggestion.parse(obj))),
       m['hasErrors'],
-      m['fixes'] == null
+      m['edits'] == null
           ? null
-          : new List.from(m['fixes'].map((obj) => SourceFileEdit.parse(obj))));
+          : new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))));
 
-  /// A list of human readable changes made by applying the fixes.
-  final List<String> descriptionOfFixes;
+  /// A list of recommended changes that can be automatically made by applying
+  /// the 'edits' included in this response.
+  final List<DartFixSuggestion> suggestions;
 
-  /// A list of human readable recommended changes that cannot be made
-  /// automatically.
-  final List<String> otherRecommendations;
+  /// A list of recommended changes that could not be automatically made.
+  final List<DartFixSuggestion> otherSuggestions;
 
   /// True if the analyzed source contains errors that might impact the
-  /// correctness of the recommended fixes that can be automatically applied.
+  /// correctness of the recommended changes that can be automatically applied.
   final bool hasErrors;
 
-  /// The suggested fixes.
-  final List<SourceFileEdit> fixes;
+  /// A list of source edits to apply the recommended changes.
+  final List<SourceFileEdit> edits;
 
-  DartfixResult(this.descriptionOfFixes, this.otherRecommendations,
-      this.hasErrors, this.fixes);
+  DartfixResult(
+      this.suggestions, this.otherSuggestions, this.hasErrors, this.edits);
 }
 
 class FixesResult {
@@ -2269,7 +2440,13 @@ class AnalysisError {
     if (m == null) return null;
     return new AnalysisError(m['severity'], m['type'],
         Location.parse(m['location']), m['message'], m['code'],
-        correction: m['correction'], hasFix: m['hasFix']);
+        correction: m['correction'],
+        url: m['url'],
+        contextMessages: m['contextMessages'] == null
+            ? null
+            : new List.from(m['contextMessages']
+                .map((obj) => DiagnosticMessage.parse(obj))),
+        hasFix: m['hasFix']);
   }
 
   /// The severity of the error.
@@ -2294,6 +2471,15 @@ class AnalysisError {
   @optional
   final String correction;
 
+  /// The URL of a page containing documentation associated with this error.
+  @optional
+  final String url;
+
+  /// Additional messages associated with this diagnostic that provide context
+  /// to help the user understand the diagnostic.
+  @optional
+  final List<DiagnosticMessage> contextMessages;
+
   /// A hint to indicate to interested clients that this error has an associated
   /// fix (or fixes). The absence of this field implies there are not known to
   /// be fixes. Note that since the operation to calculate whether fixes apply
@@ -2307,7 +2493,7 @@ class AnalysisError {
 
   AnalysisError(
       this.severity, this.type, this.location, this.message, this.code,
-      {this.correction, this.hasFix});
+      {this.correction, this.url, this.contextMessages, this.hasFix});
 
   bool operator ==(o) =>
       o is AnalysisError &&
@@ -2317,6 +2503,8 @@ class AnalysisError {
       message == o.message &&
       code == o.code &&
       correction == o.correction &&
+      url == o.url &&
+      contextMessages == o.contextMessages &&
       hasFix == o.hasFix;
 
   int get hashCode =>
@@ -2458,6 +2646,118 @@ class AnalysisStatus {
   String toString() => '[AnalysisStatus isAnalyzing: ${isAnalyzing}]';
 }
 
+/// A partial completion suggestion that can be used in combination with info
+/// from `completion.results` to build completion suggestions for not yet
+/// imported library tokens.
+class AvailableSuggestion {
+  static AvailableSuggestion parse(Map m) {
+    if (m == null) return null;
+    return new AvailableSuggestion(m['label'], Element.parse(m['element']),
+        defaultArgumentListString: m['defaultArgumentListString'],
+        defaultArgumentListTextRanges:
+            m['defaultArgumentListTextRanges'] == null
+                ? null
+                : new List.from(m['defaultArgumentListTextRanges']),
+        docComplete: m['docComplete'],
+        docSummary: m['docSummary'],
+        parameterNames: m['parameterNames'] == null
+            ? null
+            : new List.from(m['parameterNames']),
+        parameterTypes: m['parameterTypes'] == null
+            ? null
+            : new List.from(m['parameterTypes']),
+        relevanceTags: m['relevanceTags'] == null
+            ? null
+            : new List.from(m['relevanceTags']),
+        requiredParameterCount: m['requiredParameterCount']);
+  }
+
+  /// The identifier to present to the user for code completion.
+  final String label;
+
+  /// Information about the element reference being suggested.
+  final Element element;
+
+  /// A default String for use in generating argument list source contents on
+  /// the client side.
+  @optional
+  final String defaultArgumentListString;
+
+  /// Pairs of offsets and lengths describing 'defaultArgumentListString' text
+  /// ranges suitable for use by clients to set up linked edits of default
+  /// argument source contents. For example, given an argument list string 'x,
+  /// y', the corresponding text range [0, 1, 3, 1], indicates two text ranges
+  /// of length 1, starting at offsets 0 and 3. Clients can use these ranges to
+  /// treat the 'x' and 'y' values specially for linked edits.
+  @optional
+  final List<int> defaultArgumentListTextRanges;
+
+  /// The Dartdoc associated with the element being suggested. This field is
+  /// omitted if there is no Dartdoc associated with the element.
+  @optional
+  final String docComplete;
+
+  /// An abbreviated version of the Dartdoc associated with the element being
+  /// suggested. This field is omitted if there is no Dartdoc associated with
+  /// the element.
+  @optional
+  final String docSummary;
+
+  /// If the element is an executable, the names of the formal parameters of all
+  /// kinds - required, optional positional, and optional named. The names of
+  /// positional parameters are empty strings. Omitted if the element is not an
+  /// executable.
+  @optional
+  final List<String> parameterNames;
+
+  /// If the element is an executable, the declared types of the formal
+  /// parameters of all kinds - required, optional positional, and optional
+  /// named. Omitted if the element is not an executable.
+  @optional
+  final List<String> parameterTypes;
+
+  /// This field is set if the relevance of this suggestion might be changed
+  /// depending on where completion is requested.
+  @optional
+  final List<String> relevanceTags;
+
+  @optional
+  final int requiredParameterCount;
+
+  AvailableSuggestion(this.label, this.element,
+      {this.defaultArgumentListString,
+      this.defaultArgumentListTextRanges,
+      this.docComplete,
+      this.docSummary,
+      this.parameterNames,
+      this.parameterTypes,
+      this.relevanceTags,
+      this.requiredParameterCount});
+}
+
+class AvailableSuggestionSet {
+  static AvailableSuggestionSet parse(Map m) {
+    if (m == null) return null;
+    return new AvailableSuggestionSet(
+        m['id'],
+        m['uri'],
+        m['items'] == null
+            ? null
+            : new List.from(
+                m['items'].map((obj) => AvailableSuggestion.parse(obj))));
+  }
+
+  /// The id associated with the library.
+  final int id;
+
+  /// The URI of the library.
+  final String uri;
+
+  final List<AvailableSuggestion> items;
+
+  AvailableSuggestionSet(this.id, this.uri, this.items);
+}
+
 /// A directive to modify an existing file content overlay. One or more ranges
 /// of text are deleted from the old file content overlay and replaced with new
 /// text.
@@ -2543,8 +2843,7 @@ class CompletionSuggestion implements Jsonable {
         requiredParameterCount: m['requiredParameterCount'],
         hasNamedParameters: m['hasNamedParameters'],
         parameterName: m['parameterName'],
-        parameterType: m['parameterType'],
-        importUri: m['importUri']);
+        parameterType: m['parameterType']);
   }
 
   /// The kind of element being suggested.
@@ -2652,11 +2951,6 @@ class CompletionSuggestion implements Jsonable {
   @optional
   final String parameterType;
 
-  /// The import to be added if the suggestion is out of scope and needs an
-  /// import to be added to be in scope.
-  @optional
-  final String importUri;
-
   CompletionSuggestion(
       this.kind,
       this.relevance,
@@ -2678,8 +2972,7 @@ class CompletionSuggestion implements Jsonable {
       this.requiredParameterCount,
       this.hasNamedParameters,
       this.parameterName,
-      this.parameterType,
-      this.importUri});
+      this.parameterType});
 
   Map toMap() => _stripNullValues({
         'kind': kind,
@@ -2702,8 +2995,7 @@ class CompletionSuggestion implements Jsonable {
         'requiredParameterCount': requiredParameterCount,
         'hasNamedParameters': hasNamedParameters,
         'parameterName': parameterName,
-        'parameterType': parameterType,
-        'importUri': importUri
+        'parameterType': parameterType
       });
 
   String toString() =>
@@ -2741,6 +3033,69 @@ class ContextData {
 
   ContextData(this.name, this.explicitFileCount, this.implicitFileCount,
       this.workItemQueueLength, this.cacheEntryExceptions);
+}
+
+/// A "fix" that can be specified in an edit.dartfix request.
+@experimental
+class DartFix {
+  static DartFix parse(Map m) {
+    if (m == null) return null;
+    return new DartFix(m['name'],
+        description: m['description'], isRequired: m['isRequired']);
+  }
+
+  /// The name of the fix.
+  final String name;
+
+  /// A human readable description of the fix.
+  @optional
+  final String description;
+
+  /// `true` if the fix is in the "required" fixes group.
+  @optional
+  final bool isRequired;
+
+  DartFix(this.name, {this.description, this.isRequired});
+}
+
+/// A suggestion from an edit.dartfix request.
+@experimental
+class DartFixSuggestion {
+  static DartFixSuggestion parse(Map m) {
+    if (m == null) return null;
+    return new DartFixSuggestion(m['description'],
+        location: Location.parse(m['location']));
+  }
+
+  /// A human readable description of the suggested change.
+  final String description;
+
+  /// The location of the suggested change.
+  @optional
+  final Location location;
+
+  DartFixSuggestion(this.description, {this.location});
+}
+
+/// A message associated with a diagnostic.
+///
+/// For example, if the diagnostic is reporting that a variable has been
+/// referenced before it was declared, it might have a diagnostic message that
+/// indicates where the variable is declared.
+class DiagnosticMessage {
+  static DiagnosticMessage parse(Map m) {
+    if (m == null) return null;
+    return new DiagnosticMessage(m['message'], Location.parse(m['location']));
+  }
+
+  /// The message to be displayed to the user.
+  final String message;
+
+  /// The location associated with or referenced by the message. Clients should
+  /// provide the ability to navigate to the location.
+  final Location location;
+
+  DiagnosticMessage(this.message, this.location);
 }
 
 /// Information about an element (something that can be declared in code).
@@ -3244,6 +3599,57 @@ class ImportedElements implements Jsonable {
       _stripNullValues({'path': path, 'prefix': prefix, 'elements': elements});
 }
 
+/// Each `AvailableSuggestion` can specify zero or more tags in the field
+/// `relevanceTags`, so that when the included tag is equal to one of the
+/// `relevanceTags`, the suggestion is given higher relevance than the whole
+/// `IncludedSuggestionSet`.
+class IncludedSuggestionRelevanceTag {
+  static IncludedSuggestionRelevanceTag parse(Map m) {
+    if (m == null) return null;
+    return new IncludedSuggestionRelevanceTag(m['tag'], m['relevanceBoost']);
+  }
+
+  /// The opaque value of the tag.
+  final String tag;
+
+  /// The boost to the relevance of the completion suggestions that match this
+  /// tag, which is added to the relevance of the containing
+  /// `IncludedSuggestionSet`.
+  final int relevanceBoost;
+
+  IncludedSuggestionRelevanceTag(this.tag, this.relevanceBoost);
+}
+
+/// A reference to an `AvailableSuggestionSet` noting that the library's members
+/// which match the kind of this ref should be presented to the user.
+class IncludedSuggestionSet {
+  static IncludedSuggestionSet parse(Map m) {
+    if (m == null) return null;
+    return new IncludedSuggestionSet(m['id'], m['relevance'],
+        displayUri: m['displayUri']);
+  }
+
+  /// Clients should use it to access the set of precomputed completions to be
+  /// displayed to the user.
+  final int id;
+
+  /// The relevance of completion suggestions from this library where a higher
+  /// number indicates a higher relevance.
+  final int relevance;
+
+  /// The optional string that should be displayed instead of the `uri` of the
+  /// referenced `AvailableSuggestionSet`.
+  ///
+  /// For example libraries in the "test" directory of a package have only
+  /// "file://" URIs, so are usually long, and don't look nice, but actual
+  /// import directives will use relative URIs, which are short, so we probably
+  /// want to display such relative URIs to the user.
+  @optional
+  final String displayUri;
+
+  IncludedSuggestionSet(this.id, this.relevance, {this.displayUri});
+}
+
 /// This object matches the format and documentation of the Entry object
 /// documented in the (Kythe Storage
 /// Model)[https://kythe.io/docs/kythe-storage.html#_entry].
@@ -3308,6 +3714,30 @@ class KytheVName {
   final String language;
 
   KytheVName(this.signature, this.corpus, this.root, this.path, this.language);
+}
+
+/// A list of associations between paths and the libraries that should be
+/// included for code completion when editing a file beneath that path.
+class LibraryPathSet implements Jsonable {
+  static LibraryPathSet parse(Map m) {
+    if (m == null) return null;
+    return new LibraryPathSet(m['scope'],
+        m['libraryPaths'] == null ? null : new List.from(m['libraryPaths']));
+  }
+
+  /// The filepath for which this request's libraries should be active in
+  /// completion suggestions. This object associates filesystem regions to
+  /// libraries and library directories of interest to the client.
+  final String scope;
+
+  /// The paths of the libraries of interest to the client for completion
+  /// suggestions.
+  final List<String> libraryPaths;
+
+  LibraryPathSet(this.scope, this.libraryPaths);
+
+  Map toMap() =>
+      _stripNullValues({'scope': scope, 'libraryPaths': libraryPaths});
 }
 
 /// A collection of positions that should be linked (edited simultaneously) for
@@ -3745,9 +4175,9 @@ class RemoveContentOverlay extends ContentOverlayType implements Jsonable {
 }
 
 /// An expression for which we want to know its runtime type. In expressions
-/// like `a.b.c.where((e) => e.^)` we want to know the runtime type of `a.b.c`
+/// like 'a.b.c.where((e) => e.^)' we want to know the runtime type of 'a.b.c'
 /// to enforce it statically at the time when we compute completion suggestions,
-/// and get better type for `e`.
+/// and get better type for 'e'.
 class RuntimeCompletionExpression implements Jsonable {
   static RuntimeCompletionExpression parse(Map m) {
     if (m == null) return null;
@@ -4009,6 +4439,36 @@ class SourceFileEdit {
   SourceFileEdit(this.file, this.fileStamp, this.edits);
 
   String toString() => '[SourceFileEdit file: ${file}, edits: ${edits}]';
+}
+
+/// A scanned token along with its inferred type information.
+@experimental
+class TokenDetails {
+  static TokenDetails parse(Map m) {
+    if (m == null) return null;
+    return new TokenDetails(m['lexeme'],
+        type: m['type'],
+        validElementKinds: m['validElementKinds'] == null
+            ? null
+            : new List.from(m['validElementKinds']));
+  }
+
+  /// The token's lexeme.
+  final String lexeme;
+
+  /// A unique id for the type of the identifier. Omitted if the token is not an
+  /// identifier in a reference position.
+  @optional
+  final String type;
+
+  /// An indication of whether this token is in a declaration or reference
+  /// position. (If no other purpose is found for this field then it should be
+  /// renamed and converted to a boolean value.) Omitted if the token is not an
+  /// identifier.
+  @optional
+  final List<String> validElementKinds;
+
+  TokenDetails(this.lexeme, {this.type, this.validElementKinds});
 }
 
 /// A representation of a class in a type hierarchy.
