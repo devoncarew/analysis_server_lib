@@ -7,11 +7,11 @@ import 'dart:io';
 
 import 'package:analysis_server_lib/analysis_server_lib.dart';
 import 'package:logging/logging.dart';
+import 'package:pedantic/pedantic.dart';
 
 Future main(List<String> args) async {
   if (args.contains('--mini')) {
-    _miniTest();
-    return;
+    return _miniTest();
   }
 
   Logger.root.level = Level.ALL;
@@ -22,8 +22,8 @@ Future main(List<String> args) async {
   }, onWrite: (String message) {
     print('[--> $message]');
   });
-  client.processCompleter.future
-      .then((int code) => print('analysis server exited: ${code}'));
+  unawaited(client.processCompleter.future
+      .then((int code) => print('analysis server exited: ${code}')));
 
   dynamic event = await client.server.onConnected.first;
   print('server connected: ${event}');
@@ -36,7 +36,7 @@ Future main(List<String> args) async {
   VersionResult version = await client.server.getVersion();
   print('version: ${version.version}');
 
-  client.server.setSubscriptions(['STATUS']);
+  unawaited(client.server.setSubscriptions(['STATUS']));
   client.server.onStatus.listen((ServerStatus status) {
     if (status.analysis == null) return;
 
@@ -52,7 +52,7 @@ Future main(List<String> args) async {
       print('${errors.errors.length} errors for ${errors.file}');
     }
   });
-  client.analysis.setAnalysisRoots([Directory.current.path], []);
+  await client.analysis.setAnalysisRoots([Directory.current.path], []);
 }
 
 Future _miniTest() async {

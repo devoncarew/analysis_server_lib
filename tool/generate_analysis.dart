@@ -13,7 +13,7 @@ import 'src/src_gen.dart';
 
 Api api;
 
-main(List<String> args) {
+void main(List<String> args) {
   // Parse spec_input.html into a model.
   File file = new File('tool/spec_input.html');
   Document document = parse(file.readAsStringSync());
@@ -456,8 +456,15 @@ class Request {
           .join(', ');
       gen.writeStatement('final Map m = {${mapStr}};');
       for (Field arg in args.where((arg) => arg.optional)) {
-        gen.writeStatement(
-            "if (${arg.name} != null) m['${arg.name}'] = ${arg.name};");
+        final String statement =
+            "if (${arg.name} != null) m['${arg.name}'] = ${arg.name};";
+        if (statement.length + gen.indentLength <= gen.colBoundary) {
+          gen.writeStatement(statement);
+        } else {
+          gen.writeln("if (${arg.name} != null) {");
+          gen.writeln("m['${arg.name}'] = ${arg.name};");
+          gen.writeln('}');
+        }
       }
       gen.write("return _call('$qName', m)");
       if (results.isNotEmpty) {
@@ -474,7 +481,8 @@ class Request {
 
   String get resultName {
     if (results.isEmpty) return 'dynamic';
-    if (domain.name == 'execution' && method == 'getSuggestions') return 'RuntimeSuggestionsResult';
+    if (domain.name == 'execution' && method == 'getSuggestions')
+      return 'RuntimeSuggestionsResult';
     if (method.startsWith('get')) return '${method.substring(3)}Result';
     return '${titleCase(method)}Result';
   }
@@ -979,11 +987,11 @@ class _ConcatTextVisitor extends TreeVisitor {
 
   String toString() => buffer.toString();
 
-  visitText(Text node) {
+  void visitText(Text node) {
     buffer.write(node.data);
   }
 
-  visitElement(Element node) {
+  void visitElement(Element node) {
     if (node.localName == 'b') {
       buffer.write('**${node.text}**');
     } else if (node.localName == 'a') {
@@ -1069,7 +1077,8 @@ final String _staticFactory = r'''
     if (clientVersion != null) args.add('--client-version=$clientVersion');
 
     Process process = await Process.start(vmPath, args, environment: processEnvironment);
-    process.exitCode.then((code) => processCompleter.complete(code));
+    // ignore: unused_local_variable
+    Future unawaited = process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
         .transform(utf8.decoder)
