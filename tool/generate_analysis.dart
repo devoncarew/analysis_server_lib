@@ -239,11 +239,13 @@ main() async {
       gen.write('${name}(');
       gen.write(fields.map((field) {
         StringBuffer buf = new StringBuffer();
-        if (field.optional && fields.firstWhere((a) => a.optional) == field)
+        if (field.optional && fields.firstWhere((a) => a.optional) == field) {
           buf.write('{');
+        }
         buf.write('this.${field.name}');
-        if (field.optional && fields.lastWhere((a) => a.optional) == field)
+        if (field.optional && fields.lastWhere((a) => a.optional) == field) {
           buf.write('}');
+        }
         return buf.toString();
       }).join(', '));
       gen.writeln(');');
@@ -339,11 +341,13 @@ class Domain {
       gen.write('${name}(');
       gen.write(fields.map((field) {
         StringBuffer buf = new StringBuffer();
-        if (field.optional && fields.firstWhere((a) => a.optional) == field)
+        if (field.optional && fields.firstWhere((a) => a.optional) == field) {
           buf.write('{');
+        }
         buf.write('this.${field.name}');
-        if (field.optional && fields.lastWhere((a) => a.optional) == field)
+        if (field.optional && fields.lastWhere((a) => a.optional) == field) {
           buf.write('}');
+        }
         return buf.toString();
       }).join(', '));
       gen.writeln(');');
@@ -435,11 +439,13 @@ class Request {
     }
     gen.write(args.map((arg) {
       StringBuffer buf = new StringBuffer();
-      if (arg.optional && args.firstWhere((a) => a.optional) == arg)
+      if (arg.optional && args.firstWhere((a) => a.optional) == arg) {
         buf.write('{');
+      }
       buf.write('${arg.type} ${arg.name}');
-      if (arg.optional && args.lastWhere((a) => a.optional) == arg)
+      if (arg.optional && args.lastWhere((a) => a.optional) == arg) {
         buf.write('}');
+      }
       return buf.toString();
     }).join(', '));
     gen.writeStatement(') {');
@@ -481,8 +487,9 @@ class Request {
 
   String get resultName {
     if (results.isEmpty) return 'dynamic';
-    if (domain.name == 'execution' && method == 'getSuggestions')
+    if (domain.name == 'execution' && method == 'getSuggestions') {
       return 'RuntimeSuggestionsResult';
+    }
     if (method.startsWith('get')) return '${method.substring(3)}Result';
     return '${titleCase(method)}Result';
   }
@@ -555,11 +562,13 @@ class Notification {
     gen.write('${className}(');
     gen.write(fields.map((field) {
       StringBuffer buf = new StringBuffer();
-      if (field.optional && fields.firstWhere((a) => a.optional) == field)
+      if (field.optional && fields.firstWhere((a) => a.optional) == field) {
         buf.write('{');
+      }
       buf.write('this.${field.name}');
-      if (field.optional && fields.lastWhere((a) => a.optional) == field)
+      if (field.optional && fields.lastWhere((a) => a.optional) == field) {
         buf.write('}');
+      }
       return buf.toString();
     }).join(', '));
     gen.writeln(');');
@@ -792,11 +801,13 @@ class TypeDef {
     gen.write('${name}(');
     gen.write(_fields.map((field) {
       StringBuffer buf = new StringBuffer();
-      if (field.optional && fields.firstWhere((a) => a.optional) == field)
+      if (field.optional && fields.firstWhere((a) => a.optional) == field) {
         buf.write('{');
+      }
       buf.write('this.${field.name}');
-      if (field.optional && fields.lastWhere((a) => a.optional) == field)
+      if (field.optional && fields.lastWhere((a) => a.optional) == field) {
         buf.write('}');
+      }
       return buf.toString();
     }).join(', '));
     if (isContentOverlay) {
