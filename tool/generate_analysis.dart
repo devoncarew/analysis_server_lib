@@ -13,7 +13,7 @@ import 'src/src_gen.dart';
 
 Api api;
 
-main(List<String> args) {
+void main(List<String> args) {
   // Parse spec_input.html into a model.
   File file = new File('tool/spec_input.html');
   Document document = parse(file.readAsStringSync());
@@ -239,11 +239,13 @@ main() async {
       gen.write('${name}(');
       gen.write(fields.map((field) {
         StringBuffer buf = new StringBuffer();
-        if (field.optional && fields.firstWhere((a) => a.optional) == field)
+        if (field.optional && fields.firstWhere((a) => a.optional) == field) {
           buf.write('{');
+        }
         buf.write('this.${field.name}');
-        if (field.optional && fields.lastWhere((a) => a.optional) == field)
+        if (field.optional && fields.lastWhere((a) => a.optional) == field) {
           buf.write('}');
+        }
         return buf.toString();
       }).join(', '));
       gen.writeln(');');
@@ -339,11 +341,13 @@ class Domain {
       gen.write('${name}(');
       gen.write(fields.map((field) {
         StringBuffer buf = new StringBuffer();
-        if (field.optional && fields.firstWhere((a) => a.optional) == field)
+        if (field.optional && fields.firstWhere((a) => a.optional) == field) {
           buf.write('{');
+        }
         buf.write('this.${field.name}');
-        if (field.optional && fields.lastWhere((a) => a.optional) == field)
+        if (field.optional && fields.lastWhere((a) => a.optional) == field) {
           buf.write('}');
+        }
         return buf.toString();
       }).join(', '));
       gen.writeln(');');
@@ -435,11 +439,13 @@ class Request {
     }
     gen.write(args.map((arg) {
       StringBuffer buf = new StringBuffer();
-      if (arg.optional && args.firstWhere((a) => a.optional) == arg)
+      if (arg.optional && args.firstWhere((a) => a.optional) == arg) {
         buf.write('{');
+      }
       buf.write('${arg.type} ${arg.name}');
-      if (arg.optional && args.lastWhere((a) => a.optional) == arg)
+      if (arg.optional && args.lastWhere((a) => a.optional) == arg) {
         buf.write('}');
+      }
       return buf.toString();
     }).join(', '));
     gen.writeStatement(') {');
@@ -456,8 +462,15 @@ class Request {
           .join(', ');
       gen.writeStatement('final Map m = {${mapStr}};');
       for (Field arg in args.where((arg) => arg.optional)) {
-        gen.writeStatement(
-            "if (${arg.name} != null) m['${arg.name}'] = ${arg.name};");
+        final String statement =
+            "if (${arg.name} != null) m['${arg.name}'] = ${arg.name};";
+        if (statement.length + gen.indentLength <= gen.colBoundary) {
+          gen.writeStatement(statement);
+        } else {
+          gen.writeln("if (${arg.name} != null) {");
+          gen.writeln("m['${arg.name}'] = ${arg.name};");
+          gen.writeln('}');
+        }
       }
       gen.write("return _call('$qName', m)");
       if (results.isNotEmpty) {
@@ -474,7 +487,9 @@ class Request {
 
   String get resultName {
     if (results.isEmpty) return 'dynamic';
-    if (domain.name == 'execution' && method == 'getSuggestions') return 'RuntimeSuggestionsResult';
+    if (domain.name == 'execution' && method == 'getSuggestions') {
+      return 'RuntimeSuggestionsResult';
+    }
     if (method.startsWith('get')) return '${method.substring(3)}Result';
     return '${titleCase(method)}Result';
   }
@@ -547,11 +562,13 @@ class Notification {
     gen.write('${className}(');
     gen.write(fields.map((field) {
       StringBuffer buf = new StringBuffer();
-      if (field.optional && fields.firstWhere((a) => a.optional) == field)
+      if (field.optional && fields.firstWhere((a) => a.optional) == field) {
         buf.write('{');
+      }
       buf.write('this.${field.name}');
-      if (field.optional && fields.lastWhere((a) => a.optional) == field)
+      if (field.optional && fields.lastWhere((a) => a.optional) == field) {
         buf.write('}');
+      }
       return buf.toString();
     }).join(', '));
     gen.writeln(');');
@@ -784,11 +801,13 @@ class TypeDef {
     gen.write('${name}(');
     gen.write(_fields.map((field) {
       StringBuffer buf = new StringBuffer();
-      if (field.optional && fields.firstWhere((a) => a.optional) == field)
+      if (field.optional && fields.firstWhere((a) => a.optional) == field) {
         buf.write('{');
+      }
       buf.write('this.${field.name}');
-      if (field.optional && fields.lastWhere((a) => a.optional) == field)
+      if (field.optional && fields.lastWhere((a) => a.optional) == field) {
         buf.write('}');
+      }
       return buf.toString();
     }).join(', '));
     if (isContentOverlay) {
@@ -979,11 +998,11 @@ class _ConcatTextVisitor extends TreeVisitor {
 
   String toString() => buffer.toString();
 
-  visitText(Text node) {
+  void visitText(Text node) {
     buffer.write(node.data);
   }
 
-  visitElement(Element node) {
+  void visitElement(Element node) {
     if (node.localName == 'b') {
       buffer.write('**${node.text}**');
     } else if (node.localName == 'a') {
@@ -1069,7 +1088,8 @@ final String _staticFactory = r'''
     if (clientVersion != null) args.add('--client-version=$clientVersion');
 
     Process process = await Process.start(vmPath, args, environment: processEnvironment);
-    process.exitCode.then((code) => processCompleter.complete(code));
+    // ignore: unused_local_variable
+    Future unawaited = process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
         .transform(utf8.decoder)

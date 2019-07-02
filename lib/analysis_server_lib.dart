@@ -24,7 +24,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.26.1';
+const String generatedProtocolVersion = '1.27.1';
 
 typedef void MethodSend(String methodName);
 
@@ -83,7 +83,9 @@ class AnalysisServer {
 
     Process process =
         await Process.start(vmPath, args, environment: processEnvironment);
-    process.exitCode.then((code) => processCompleter.complete(code));
+    // ignore: unused_local_variable
+    Future unawaited =
+        process.exitCode.then((code) => processCompleter.complete(code));
 
     Stream<String> inStream = process.stdout
         .transform(utf8.decoder)
@@ -1147,6 +1149,14 @@ class CompletionDomain extends Domain {
         CompletionAvailableSuggestions.parse);
   }
 
+  /// Reports existing imports in a library. This notification may be sent
+  /// multiple times for a library. When a notification is processed, clients
+  /// should replace any previous information for the library.
+  Stream<CompletionExistingImports> get onExistingImports {
+    return _listen(
+        'completion.existingImports', CompletionExistingImports.parse);
+  }
+
   /// Request that completion suggestions for the given offset in the given file
   /// be returned.
   Future<SuggestionsResult> getSuggestions(String file, int offset) {
@@ -1207,6 +1217,7 @@ class CompletionResults {
           : new List.from(
               m['results'].map((obj) => CompletionSuggestion.parse(obj))),
       m['isLast'],
+      libraryFile: m['libraryFile'],
       includedSuggestionSets: m['includedSuggestionSets'] == null
           ? null
           : new List.from(m['includedSuggestionSets']
@@ -1244,6 +1255,14 @@ class CompletionResults {
   /// indicated completion.
   final bool isLast;
 
+  /// The library file that contains the file where completion was requested.
+  /// The client might use it for example together with the `existingImports`
+  /// notification to filter out available suggestions. If there were changes to
+  /// existing imports in the library, the corresponding `existingImports`
+  /// notification will be sent before the completion notification.
+  @optional
+  final String libraryFile;
+
   /// References to `AvailableSuggestionSet` objects previously sent to the
   /// client. The client can include applicable names from the referenced
   /// library in code completion suggestions.
@@ -1269,7 +1288,8 @@ class CompletionResults {
 
   CompletionResults(this.id, this.replacementOffset, this.replacementLength,
       this.results, this.isLast,
-      {this.includedSuggestionSets,
+      {this.libraryFile,
+      this.includedSuggestionSets,
       this.includedElementKinds,
       this.includedSuggestionRelevanceTags});
 }
@@ -1296,6 +1316,20 @@ class CompletionAvailableSuggestions {
 
   CompletionAvailableSuggestions(
       {this.changedLibraries, this.removedLibraries});
+}
+
+class CompletionExistingImports {
+  static CompletionExistingImports parse(Map m) =>
+      new CompletionExistingImports(
+          m['file'], ExistingImports.parse(m['imports']));
+
+  /// The defining file of the library.
+  final String file;
+
+  /// The existing imports in the library.
+  final ExistingImports imports;
+
+  CompletionExistingImports(this.file, this.imports);
 }
 
 class SuggestionsResult {
@@ -1615,8 +1649,9 @@ class EditDomain extends Domain {
       List<String> excludedFixes}) {
     final Map m = {'included': included};
     if (includedFixes != null) m['includedFixes'] = includedFixes;
-    if (includeRequiredFixes != null)
+    if (includeRequiredFixes != null) {
       m['includeRequiredFixes'] = includeRequiredFixes;
+    }
     if (excludedFixes != null) m['excludedFixes'] = excludedFixes;
     return _call('edit.dartfix', m).then(DartfixResult.parse);
   }
@@ -1805,7 +1840,8 @@ class DartfixResult {
       m['hasErrors'],
       m['edits'] == null
           ? null
-          : new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))));
+          : new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
+      details: m['details'] == null ? null : new List.from(m['details']));
 
   /// A list of recommended changes that can be automatically made by applying
   /// the 'edits' included in this response.
@@ -1821,8 +1857,17 @@ class DartfixResult {
   /// A list of source edits to apply the recommended changes.
   final List<SourceFileEdit> edits;
 
+  /// Messages that should be displayed to the user that describe details of the
+  /// fix generation. For example, the messages might (a) point out details that
+  /// users might want to explore before committing the changes or (b) describe
+  /// exceptions that were thrown but that did not stop the fixes from being
+  /// produced. The list will be omitted if it is empty.
+  @optional
+  final List<String> details;
+
   DartfixResult(
-      this.suggestions, this.otherSuggestions, this.hasErrors, this.edits);
+      this.suggestions, this.otherSuggestions, this.hasErrors, this.edits,
+      {this.details});
 }
 
 class FixesResult {
@@ -2652,7 +2697,8 @@ class AnalysisStatus {
 class AvailableSuggestion {
   static AvailableSuggestion parse(Map m) {
     if (m == null) return null;
-    return new AvailableSuggestion(m['label'], Element.parse(m['element']),
+    return new AvailableSuggestion(
+        m['label'], m['declaringLibraryUri'], Element.parse(m['element']),
         defaultArgumentListString: m['defaultArgumentListString'],
         defaultArgumentListTextRanges:
             m['defaultArgumentListTextRanges'] == null
@@ -2674,6 +2720,10 @@ class AvailableSuggestion {
 
   /// The identifier to present to the user for code completion.
   final String label;
+
+  /// The URI of the library that declares the element being suggested, not the
+  /// URI of the library associated with the enclosing `AvailableSuggestionSet`.
+  final String declaringLibraryUri;
 
   /// Information about the element reference being suggested.
   final Element element;
@@ -2724,7 +2774,7 @@ class AvailableSuggestion {
   @optional
   final int requiredParameterCount;
 
-  AvailableSuggestion(this.label, this.element,
+  AvailableSuggestion(this.label, this.declaringLibraryUri, this.element,
       {this.defaultArgumentListString,
       this.defaultArgumentListTextRanges,
       this.docComplete,
@@ -3234,6 +3284,46 @@ class ExecutableFile {
   ExecutableFile(this.file, this.kind);
 }
 
+/// Information about an existing import, with elements that it provides.
+class ExistingImport {
+  static ExistingImport parse(Map m) {
+    if (m == null) return null;
+    return new ExistingImport(
+        m['uri'], m['elements'] == null ? null : new List.from(m['elements']));
+  }
+
+  /// The URI of the imported library. It is an index in the `strings` field, in
+  /// the enclosing `ExistingImports` and its `ImportedElementSet` object.
+  final int uri;
+
+  /// The list of indexes of elements, in the enclosing `ExistingImports`
+  /// object.
+  final List<int> elements;
+
+  ExistingImport(this.uri, this.elements);
+}
+
+/// Information about all existing imports in a library.
+class ExistingImports {
+  static ExistingImports parse(Map m) {
+    if (m == null) return null;
+    return new ExistingImports(
+        ImportedElementSet.parse(m['elements']),
+        m['imports'] == null
+            ? null
+            : new List.from(
+                m['imports'].map((obj) => ExistingImport.parse(obj))));
+  }
+
+  /// The set of all unique imported elements for all imports.
+  final ImportedElementSet elements;
+
+  /// The list of imports in the library.
+  final List<ExistingImport> imports;
+
+  ExistingImports(this.elements, this.imports);
+}
+
 /// An node in the Flutter specific outline structure of a file.
 @experimental
 class FlutterOutline {
@@ -3478,9 +3568,9 @@ class HoverInformation {
   @optional
   final String containingLibraryPath;
 
-  /// The name of the library in which the referenced element is declared. This
-  /// data is omitted if there is no referenced element, or if the element is
-  /// declared inside an HTML file.
+  /// The URI of the containing library, examples here include "dart:core",
+  /// "package:.." and file uris represented by the path on disk, "/..". The
+  /// data is omitted if the element is declared inside an HTML file.
   @optional
   final String containingLibraryName;
 
@@ -3572,6 +3662,31 @@ class ImplementedMember {
   final int length;
 
   ImplementedMember(this.offset, this.length);
+}
+
+/// The set of top-level elements encoded as pairs of the defining library URI
+/// and the name, and stored in the parallel lists `elementUris` and
+/// `elementNames`.
+class ImportedElementSet {
+  static ImportedElementSet parse(Map m) {
+    if (m == null) return null;
+    return new ImportedElementSet(
+        m['strings'] == null ? null : new List.from(m['strings']),
+        m['uris'] == null ? null : new List.from(m['uris']),
+        m['names'] == null ? null : new List.from(m['names']));
+  }
+
+  /// The list of unique strings in this object.
+  final List<String> strings;
+
+  /// The library URI part of the element. It is an index in the `strings`
+  /// field.
+  final List<int> uris;
+
+  /// The name part of a the element. It is an index in the `strings` field.
+  final List<int> names;
+
+  ImportedElementSet(this.strings, this.uris, this.names);
 }
 
 /// A description of the elements that are referenced in a region of a file that

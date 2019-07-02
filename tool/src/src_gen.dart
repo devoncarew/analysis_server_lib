@@ -39,11 +39,9 @@ String joinLast(Iterable<String> strs, String join, [String last]) {
   return buf.toString();
 }
 
-/**
- * A class used to generate Dart source code. This class facilitates writing out
- * dartdoc comments, automatically manages indent by counting curly braces, and
- * automatically wraps doc comments on 80 char column boundaries.
- */
+/// A class used to generate Dart source code. This class facilitates writing out
+/// dartdoc comments, automatically manages indent by counting curly braces, and
+/// automatically wraps doc comments on 80 char column boundaries.
 class DartGenerator {
   static const DEFAULT_COLUMN_BOUNDARY = 80;
 
@@ -54,7 +52,9 @@ class DartGenerator {
 
   bool _previousWasEol = false;
 
-  DartGenerator({this.colBoundary: DEFAULT_COLUMN_BOUNDARY});
+  DartGenerator({this.colBoundary = DEFAULT_COLUMN_BOUNDARY});
+
+  int get indentLength => _indent.length;
 
   /// Write out the given dartdoc text, wrapping lines as necessary to flow
   /// along the column boundary.
@@ -68,15 +68,13 @@ class DartGenerator {
     docs.split('\n').forEach((line) => _writeln('/// ${line}'));
   }
 
-  /**
-   * Write out the given Dart statement and terminate it with an eol. If the
-   * statement will overflow the column boundary, attempt to wrap it at
-   * reasonable places.
-   */
+  /// Write out the given Dart statement and terminate it with an eol. If the
+  /// statement will overflow the column boundary, attempt to wrap it at
+  /// reasonable places.
   void writeStatement(String str) {
     if (_indent.length + str.length > colBoundary) {
       // Split the line on the first '('. Currently, we don't do anything
-      // fancier then that. This takes the edge off the long lines.
+      // fancier then that. This takes the edge off long lines.
       int index = str.indexOf('(');
 
       if (index == -1) {
@@ -156,7 +154,7 @@ String _simpleWrap(String str, [int col = 80]) {
     }
   }
 
-  if (str.length > 0) lines.add(str);
+  if (str.isNotEmpty) lines.add(str);
 
   return lines.join('\n');
 }

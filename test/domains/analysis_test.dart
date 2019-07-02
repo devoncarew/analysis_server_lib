@@ -23,14 +23,14 @@ void defineTests() {
 
     test('analyze', () async {
       await helper.init();
-      helper.createFile('main.dart', "main() { print('hello'); }");
+      await helper.createFile('main.dart', "main() { print('hello'); }");
       await helper.onAnalysisFinished.first;
       expect(helper.errors, isEmpty);
     });
 
     test('analyze with errors', () async {
       await helper.init();
-      helper.createFile('main.dart', "main() { print('hello') }");
+      await helper.createFile('main.dart', "main() { print('hello') }");
       await helper.onAnalysisFinished.first;
       expect(helper.errors.keys, hasLength(1));
       List<AnalysisError> errors = helper.errors.values.first;
