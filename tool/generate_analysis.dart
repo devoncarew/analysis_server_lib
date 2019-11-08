@@ -871,6 +871,7 @@ abstract class Type {
       if (text == 'int' ||
           text == 'bool' ||
           text == 'String' ||
+          text == 'double' ||
           text == 'long') {
         return new PrimitiveType(text);
       } else {
