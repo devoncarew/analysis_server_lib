@@ -24,7 +24,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.27.1';
+const String generatedProtocolVersion = '1.27.4';
 
 typedef void MethodSend(String methodName);
 
@@ -336,6 +336,11 @@ class ServerDomain extends Domain {
     return _listen('server.error', ServerError.parse);
   }
 
+  /// The stream of entries describing events happened in the server.
+  Stream<ServerLog> get onLog {
+    return _listen('server.log', ServerLog.parse);
+  }
+
   /// Reports the current status of the server. Parameters are omitted if there
   /// has been no change in the status represented by that parameter.
   ///
@@ -369,7 +374,7 @@ class ServerDomain extends Domain {
 
 class ServerConnected {
   static ServerConnected parse(Map m) =>
-      new ServerConnected(m['version'], m['pid'], sessionId: m['sessionId']);
+      new ServerConnected(m['version'], m['pid']);
 
   /// The version number of the analysis server.
   final String version;
@@ -377,11 +382,7 @@ class ServerConnected {
   /// The process id of the analysis server process.
   final int pid;
 
-  /// The session id for this session.
-  @optional
-  final String sessionId;
-
-  ServerConnected(this.version, this.pid, {this.sessionId});
+  ServerConnected(this.version, this.pid);
 }
 
 class ServerError {
@@ -400,6 +401,15 @@ class ServerError {
   final String stackTrace;
 
   ServerError(this.isFatal, this.message, this.stackTrace);
+}
+
+class ServerLog {
+  static ServerLog parse(Map m) =>
+      new ServerLog(ServerLogEntry.parse(m['entry']));
+
+  final ServerLogEntry entry;
+
+  ServerLog(this.entry);
 }
 
 class ServerStatus {
@@ -1645,14 +1655,22 @@ class EditDomain extends Domain {
   @experimental
   Future<DartfixResult> dartfix(List<String> included,
       {List<String> includedFixes,
+      bool includePedanticFixes,
       bool includeRequiredFixes,
-      List<String> excludedFixes}) {
+      List<String> excludedFixes,
+      int port,
+      String outputDir}) {
     final Map m = {'included': included};
     if (includedFixes != null) m['includedFixes'] = includedFixes;
+    if (includePedanticFixes != null) {
+      m['includePedanticFixes'] = includePedanticFixes;
+    }
     if (includeRequiredFixes != null) {
       m['includeRequiredFixes'] = includeRequiredFixes;
     }
     if (excludedFixes != null) m['excludedFixes'] = excludedFixes;
+    if (port != null) m['port'] = port;
+    if (outputDir != null) m['outputDir'] = outputDir;
     return _call('edit.dartfix', m).then(DartfixResult.parse);
   }
 
@@ -1665,7 +1683,6 @@ class EditDomain extends Domain {
 
   /// Get the changes required to convert the postfix template at the given
   /// location into the template's expanded form.
-  @experimental
   Future<PostfixCompletionResult> getPostfixCompletion(
       String file, String key, int offset) {
     final Map m = {'file': file, 'key': key, 'offset': offset};
@@ -2375,7 +2392,6 @@ class KytheEntriesResult {
 // flutter domain
 
 /// The analysis domain contains API’s related to Flutter support.
-@experimental
 class FlutterDomain extends Domain {
   FlutterDomain(AnalysisServer server) : super(server, 'flutter');
 
@@ -2388,13 +2404,32 @@ class FlutterDomain extends Domain {
     return _listen('flutter.outline', FlutterOutlineEvent.parse);
   }
 
-  /// Return the change that adds the forDesignTime() constructor for the widget
-  /// class at the given offset.
-  Future<ChangeAddForDesignTimeConstructorResult>
-      getChangeAddForDesignTimeConstructor(String file, int offset) {
+  /// Return the description of the widget instance at the given location.
+  ///
+  /// If the location does not have a support widget, an error of type
+  /// `FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET` will be generated.
+  @experimental
+  Future<WidgetDescriptionResult> getWidgetDescription(
+      String file, int offset) {
     final Map m = {'file': file, 'offset': offset};
-    return _call('flutter.getChangeAddForDesignTimeConstructor', m)
-        .then(ChangeAddForDesignTimeConstructorResult.parse);
+    return _call('flutter.getWidgetDescription', m)
+        .then(WidgetDescriptionResult.parse);
+  }
+
+  /// Set the value of a property, or remove it.
+  ///
+  /// The server will generate a change that the client should apply to the
+  /// project to get the value of the property set to the new value. The
+  /// complexity of the change might be from updating a single literal value in
+  /// the code, to updating multiple files to get libraries imported, and new
+  /// intermediate widgets instantiated.
+  @experimental
+  Future<SetWidgetPropertyValueResult> setWidgetPropertyValue(int id,
+      {FlutterWidgetPropertyValue value}) {
+    final Map m = {'id': id};
+    if (value != null) m['value'] = value;
+    return _call('flutter.setWidgetPropertyValue', m)
+        .then(SetWidgetPropertyValueResult.parse);
   }
 
   /// Subscribe for services that are specific to individual files. All previous
@@ -2426,8 +2461,7 @@ class FlutterDomain extends Domain {
 
 class FlutterOutlineEvent {
   static FlutterOutlineEvent parse(Map m) =>
-      new FlutterOutlineEvent(m['file'], FlutterOutline.parse(m['outline']),
-          instrumentedCode: m['instrumentedCode']);
+      new FlutterOutlineEvent(m['file'], FlutterOutline.parse(m['outline']));
 
   /// The file with which the outline is associated.
   final String file;
@@ -2435,26 +2469,33 @@ class FlutterOutlineEvent {
   /// The outline associated with the file.
   final FlutterOutline outline;
 
-  /// If the file has Flutter widgets that can be rendered, this field has the
-  /// instrumented content of the file, that allows associating widgets with
-  /// corresponding outline nodes. If there are no widgets to render, this field
-  /// is absent.
-  @optional
-  final String instrumentedCode;
-
-  FlutterOutlineEvent(this.file, this.outline, {this.instrumentedCode});
+  FlutterOutlineEvent(this.file, this.outline);
 }
 
-class ChangeAddForDesignTimeConstructorResult {
-  static ChangeAddForDesignTimeConstructorResult parse(Map m) =>
-      new ChangeAddForDesignTimeConstructorResult(
-          SourceChange.parse(m['change']));
+class WidgetDescriptionResult {
+  static WidgetDescriptionResult parse(Map m) =>
+      new WidgetDescriptionResult(m['properties'] == null
+          ? null
+          : new List.from(
+              m['properties'].map((obj) => FlutterWidgetProperty.parse(obj))));
 
-  /// The change that adds the forDesignTime() constructor. If the change cannot
-  /// be produced, an error is returned.
+  /// The list of properties of the widget. Some of the properties might be read
+  /// only, when their `editor` is not set. This might be because they have type
+  /// that we don't know how to edit, or for compound properties that work as
+  /// containers for sub-properties.
+  final List<FlutterWidgetProperty> properties;
+
+  WidgetDescriptionResult(this.properties);
+}
+
+class SetWidgetPropertyValueResult {
+  static SetWidgetPropertyValueResult parse(Map m) =>
+      new SetWidgetPropertyValueResult(SourceChange.parse(m['change']));
+
+  /// The change that should be applied.
   final SourceChange change;
 
-  ChangeAddForDesignTimeConstructorResult(this.change);
+  SetWidgetPropertyValueResult(this.change);
 }
 
 // type definitions
@@ -2704,8 +2745,6 @@ class AvailableSuggestion {
             m['defaultArgumentListTextRanges'] == null
                 ? null
                 : new List.from(m['defaultArgumentListTextRanges']),
-        docComplete: m['docComplete'],
-        docSummary: m['docSummary'],
         parameterNames: m['parameterNames'] == null
             ? null
             : new List.from(m['parameterNames']),
@@ -2742,17 +2781,6 @@ class AvailableSuggestion {
   @optional
   final List<int> defaultArgumentListTextRanges;
 
-  /// The Dartdoc associated with the element being suggested. This field is
-  /// omitted if there is no Dartdoc associated with the element.
-  @optional
-  final String docComplete;
-
-  /// An abbreviated version of the Dartdoc associated with the element being
-  /// suggested. This field is omitted if there is no Dartdoc associated with
-  /// the element.
-  @optional
-  final String docSummary;
-
   /// If the element is an executable, the names of the formal parameters of all
   /// kinds - required, optional positional, and optional named. The names of
   /// positional parameters are empty strings. Omitted if the element is not an
@@ -2777,8 +2805,6 @@ class AvailableSuggestion {
   AvailableSuggestion(this.label, this.declaringLibraryUri, this.element,
       {this.defaultArgumentListString,
       this.defaultArgumentListTextRanges,
-      this.docComplete,
-      this.docSummary,
       this.parameterNames,
       this.parameterTypes,
       this.relevanceTags,
@@ -3325,7 +3351,6 @@ class ExistingImports {
 }
 
 /// An node in the Flutter specific outline structure of a file.
-@experimental
 class FlutterOutline {
   static FlutterOutline parse(Map m) {
     if (m == null) return null;
@@ -3343,13 +3368,7 @@ class FlutterOutline {
         children: m['children'] == null
             ? null
             : new List.from(
-                m['children'].map((obj) => FlutterOutline.parse(obj))),
-        id: m['id'],
-        isWidgetClass: m['isWidgetClass'],
-        renderConstructor: m['renderConstructor'],
-        stateClassName: m['stateClassName'],
-        stateOffset: m['stateOffset'],
-        stateLength: m['stateLength']);
+                m['children'].map((obj) => FlutterOutline.parse(obj))));
   }
 
   /// The kind of the node.
@@ -3406,42 +3425,6 @@ class FlutterOutline {
   @optional
   final List<FlutterOutline> children;
 
-  /// If the node is a widget, and it is instrumented, the unique identifier of
-  /// this widget, that can be used to associate rendering information with this
-  /// node.
-  @optional
-  final int id;
-
-  /// True if the node is a widget class, so it can potentially be rendered,
-  /// even if it does not yet have the rendering constructor. This field is
-  /// omitted if the node is not a widget class.
-  @optional
-  final bool isWidgetClass;
-
-  /// If the node is a widget class that can be rendered for IDE, the name of
-  /// the constructor that should be used to instantiate the widget. Empty
-  /// string for default constructor. Absent if the node is not a widget class
-  /// that can be rendered.
-  @optional
-  final String renderConstructor;
-
-  /// If the node is a StatefulWidget, and its state class is defined in the
-  /// same file, the name of the state class.
-  @optional
-  final String stateClassName;
-
-  /// If the node is a StatefulWidget that can be rendered, and its state class
-  /// is defined in the same file, the offset of the state class code in the
-  /// file.
-  @optional
-  final int stateOffset;
-
-  /// If the node is a StatefulWidget that can be rendered, and its state class
-  /// is defined in the same file, the length of the state class code in the
-  /// file.
-  @optional
-  final int stateLength;
-
   FlutterOutline(
       this.kind, this.offset, this.length, this.codeOffset, this.codeLength,
       {this.label,
@@ -3450,24 +3433,19 @@ class FlutterOutline {
       this.className,
       this.parentAssociationLabel,
       this.variableName,
-      this.children,
-      this.id,
-      this.isWidgetClass,
-      this.renderConstructor,
-      this.stateClassName,
-      this.stateOffset,
-      this.stateLength});
+      this.children});
 }
 
 /// An attribute for a FlutterOutline.
-@experimental
 class FlutterOutlineAttribute {
   static FlutterOutlineAttribute parse(Map m) {
     if (m == null) return null;
     return new FlutterOutlineAttribute(m['name'], m['label'],
         literalValueBoolean: m['literalValueBoolean'],
         literalValueInteger: m['literalValueInteger'],
-        literalValueString: m['literalValueString']);
+        literalValueString: m['literalValueString'],
+        nameLocation: Location.parse(m['nameLocation']),
+        valueLocation: Location.parse(m['valueLocation']));
   }
 
   /// The name of the attribute.
@@ -3492,10 +3470,196 @@ class FlutterOutlineAttribute {
   @optional
   final String literalValueString;
 
+  /// If the attribute is a named argument, the location of the name, without
+  /// the colon.
+  @optional
+  final Location nameLocation;
+
+  /// The location of the value.
+  ///
+  /// This field is always available, but marked optional for backward
+  /// compatibility between new clients with older servers.
+  @optional
+  final Location valueLocation;
+
   FlutterOutlineAttribute(this.name, this.label,
       {this.literalValueBoolean,
       this.literalValueInteger,
-      this.literalValueString});
+      this.literalValueString,
+      this.nameLocation,
+      this.valueLocation});
+}
+
+/// A property of a Flutter widget.
+class FlutterWidgetProperty {
+  static FlutterWidgetProperty parse(Map m) {
+    if (m == null) return null;
+    return new FlutterWidgetProperty(
+        m['id'], m['isRequired'], m['isSafeToUpdate'], m['name'],
+        documentation: m['documentation'],
+        expression: m['expression'],
+        children: m['children'] == null
+            ? null
+            : new List.from(
+                m['children'].map((obj) => FlutterWidgetProperty.parse(obj))),
+        editor: FlutterWidgetPropertyEditor.parse(m['editor']),
+        value: FlutterWidgetPropertyValue.parse(m['value']));
+  }
+
+  /// The unique identifier of the property, must be passed back to the server
+  /// when updating the property value. Identifiers become invalid on any source
+  /// code change.
+  final int id;
+
+  /// True if the property is required, e.g. because it corresponds to a
+  /// required parameter of a constructor.
+  final bool isRequired;
+
+  /// If the property expression is a concrete value (e.g. a literal, or an enum
+  /// constant), then it is safe to replace the expression with another concrete
+  /// value. In this case this field is true. Otherwise, for example when the
+  /// expression is a reference to a field, so that its value is provided from
+  /// outside, this field is false.
+  final bool isSafeToUpdate;
+
+  /// The name of the property to display to the user.
+  final String name;
+
+  /// The documentation of the property to show to the user. Omitted if the
+  /// server does not know the documentation, e.g. because the corresponding
+  /// field is not documented.
+  @optional
+  final String documentation;
+
+  /// If the value of this property is set, the Dart code of the expression of
+  /// this property.
+  @optional
+  final String expression;
+
+  /// The list of children properties, if any. For example any property of type
+  /// `EdgeInsets` will have four children properties of type `double` - left /
+  /// top / right / bottom.
+  @optional
+  final List<FlutterWidgetProperty> children;
+
+  /// The editor that should be used by the client. This field is omitted if the
+  /// server does not know the editor for this property, for example because it
+  /// does not have one of the supported types.
+  @optional
+  final FlutterWidgetPropertyEditor editor;
+
+  /// If the expression is set, and the server knows the value of the
+  /// expression, this field is set.
+  @optional
+  final FlutterWidgetPropertyValue value;
+
+  FlutterWidgetProperty(
+      this.id, this.isRequired, this.isSafeToUpdate, this.name,
+      {this.documentation,
+      this.expression,
+      this.children,
+      this.editor,
+      this.value});
+}
+
+/// An editor for a property of a Flutter widget.
+class FlutterWidgetPropertyEditor {
+  static FlutterWidgetPropertyEditor parse(Map m) {
+    if (m == null) return null;
+    return new FlutterWidgetPropertyEditor(m['kind'],
+        enumItems: m['enumItems'] == null
+            ? null
+            : new List.from(m['enumItems']
+                .map((obj) => FlutterWidgetPropertyValueEnumItem.parse(obj))));
+  }
+
+  final String kind;
+
+  @optional
+  final List<FlutterWidgetPropertyValueEnumItem> enumItems;
+
+  FlutterWidgetPropertyEditor(this.kind, {this.enumItems});
+}
+
+/// A value of a property of a Flutter widget.
+class FlutterWidgetPropertyValue implements Jsonable {
+  static FlutterWidgetPropertyValue parse(Map m) {
+    if (m == null) return null;
+    return new FlutterWidgetPropertyValue(
+        boolValue: m['boolValue'],
+        doubleValue: m['doubleValue'],
+        intValue: m['intValue'],
+        stringValue: m['stringValue'],
+        enumValue: FlutterWidgetPropertyValueEnumItem.parse(m['enumValue']),
+        expression: m['expression']);
+  }
+
+  @optional
+  final bool boolValue;
+
+  @optional
+  final double doubleValue;
+
+  @optional
+  final int intValue;
+
+  @optional
+  final String stringValue;
+
+  @optional
+  final FlutterWidgetPropertyValueEnumItem enumValue;
+
+  /// A free-form expression, which will be used as the value as is.
+  @optional
+  final String expression;
+
+  FlutterWidgetPropertyValue(
+      {this.boolValue,
+      this.doubleValue,
+      this.intValue,
+      this.stringValue,
+      this.enumValue,
+      this.expression});
+
+  Map toMap() => _stripNullValues({
+        'boolValue': boolValue,
+        'doubleValue': doubleValue,
+        'intValue': intValue,
+        'stringValue': stringValue,
+        'enumValue': enumValue,
+        'expression': expression
+      });
+}
+
+/// An item of an enumeration in a general sense - actual `enum` value, or a
+/// static field in a class.
+class FlutterWidgetPropertyValueEnumItem {
+  static FlutterWidgetPropertyValueEnumItem parse(Map m) {
+    if (m == null) return null;
+    return new FlutterWidgetPropertyValueEnumItem(
+        m['libraryUri'], m['className'], m['name'],
+        documentation: m['documentation']);
+  }
+
+  /// The URI of the library containing the `className`. When the enum item is
+  /// passed back, this will allow the server to import the corresponding
+  /// library if necessary.
+  final String libraryUri;
+
+  /// The name of the class or enum.
+  final String className;
+
+  /// The name of the field in the enumeration, or the static field in the
+  /// class.
+  final String name;
+
+  /// The documentation to show to the user. Omitted if the server does not know
+  /// the documentation, e.g. because the corresponding field is not documented.
+  @optional
+  final String documentation;
+
+  FlutterWidgetPropertyValueEnumItem(this.libraryUri, this.className, this.name,
+      {this.documentation});
 }
 
 /// A description of a region that can be folded.
@@ -4441,6 +4605,29 @@ class SearchResult {
       '[SearchResult location: ${location}, kind: ${kind}, isPotential: ${isPotential}, path: ${path}]';
 }
 
+/// A log entry from the server.
+@experimental
+class ServerLogEntry {
+  static ServerLogEntry parse(Map m) {
+    if (m == null) return null;
+    return new ServerLogEntry(m['time'], m['kind'], m['data']);
+  }
+
+  /// The time (milliseconds since epoch) at which the server created this log
+  /// entry.
+  final int time;
+
+  /// The kind of the entry, used to determine how to interpret the "data"
+  /// field.
+  final String kind;
+
+  /// The payload of the entry, the actual format is determined by the "kind"
+  /// field.
+  final String data;
+
+  ServerLogEntry(this.time, this.kind, this.data);
+}
+
 /// A description of a set of edits that implement a single conceptual change.
 class SourceChange {
   static SourceChange parse(Map m) {
@@ -4561,7 +4748,7 @@ class SourceFileEdit {
 class TokenDetails {
   static TokenDetails parse(Map m) {
     if (m == null) return null;
-    return new TokenDetails(m['lexeme'],
+    return new TokenDetails(m['lexeme'], m['offset'],
         type: m['type'],
         validElementKinds: m['validElementKinds'] == null
             ? null
@@ -4570,6 +4757,10 @@ class TokenDetails {
 
   /// The token's lexeme.
   final String lexeme;
+
+  /// The offset of the first character of the token in the file which it
+  /// originated from.
+  final int offset;
 
   /// A unique id for the type of the identifier. Omitted if the token is not an
   /// identifier in a reference position.
@@ -4583,7 +4774,7 @@ class TokenDetails {
   @optional
   final List<String> validElementKinds;
 
-  TokenDetails(this.lexeme, {this.type, this.validElementKinds});
+  TokenDetails(this.lexeme, this.offset, {this.type, this.validElementKinds});
 }
 
 /// A representation of a class in a type hierarchy.
