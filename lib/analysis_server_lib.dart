@@ -1183,13 +1183,7 @@ class CompletionDomain extends Domain {
   Future setSubscriptions(List<String> subscriptions) =>
       _call('completion.setSubscriptions', {'subscriptions': subscriptions});
 
-  /// The client can make this request to express interest in certain libraries
-  /// to receive completion suggestions from based on the client path. If this
-  /// request is received before the client has used
-  /// 'completion.setSubscriptions' to subscribe to the
-  /// `AVAILABLE_SUGGESTION_SETS` service, then an error of type
-  /// `NOT_SUBSCRIBED_TO_AVAILABLE_SUGGESTION_SETS` will be generated. All
-  /// previous paths are replaced by the given set of paths.
+  @deprecated
   Future registerLibraryPaths(List<LibraryPathSet> paths) =>
       _call('completion.registerLibraryPaths', {'paths': paths});
 
@@ -1858,7 +1852,9 @@ class DartfixResult {
       m['edits'] == null
           ? null
           : new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
-      details: m['details'] == null ? null : new List.from(m['details']));
+      details: m['details'] == null ? null : new List.from(m['details']),
+      port: m['port'],
+      urls: m['urls'] == null ? null : new List.from(m['urls']));
 
   /// A list of recommended changes that can be automatically made by applying
   /// the 'edits' included in this response.
@@ -1882,9 +1878,20 @@ class DartfixResult {
   @optional
   final List<String> details;
 
+  /// The port on which the preview tool will respond to GET requests. The field
+  /// is omitted if a preview was not requested.
+  @optional
+  final int port;
+
+  /// The URLs that users can visit in a browser to see a preview of the
+  /// proposed changes. There is one URL for each of the included file paths.
+  /// The field is omitted if a preview was not requested.
+  @optional
+  final List<String> urls;
+
   DartfixResult(
       this.suggestions, this.otherSuggestions, this.hasErrors, this.edits,
-      {this.details});
+      {this.details, this.port, this.urls});
 }
 
 class FixesResult {
