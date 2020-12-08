@@ -24,7 +24,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.27.4';
+const String generatedProtocolVersion = '1.32.1';
 
 typedef void MethodSend(String methodName);
 
@@ -1634,23 +1634,32 @@ class EditDomain extends Domain {
   Future<DartfixInfoResult> getDartfixInfo() =>
       _call('edit.getDartfixInfo').then(DartfixInfoResult.parse);
 
+  /// Analyze the specified sources for fixes that can be applied in bulk and
+  /// return a set of suggested edits for those sources. These edits may include
+  /// changes to sources outside the set of specified sources if a change in a
+  /// specified source requires it.
+  @experimental
+  Future<BulkFixesResult> bulkFixes(List<String> included) {
+    final Map m = {'included': included};
+    return _call('edit.bulkFixes', m).then(BulkFixesResult.parse);
+  }
+
   /// Analyze the specified sources for recommended changes and return a set of
   /// suggested edits for those sources. These edits may include changes to
   /// sources outside the set of specified sources if a change in a specified
   /// source requires it.
   ///
   /// If includedFixes is specified, then those fixes will be applied. If
-  /// includeRequiredFixes is specified, then "required" fixes will be applied
-  /// in addition to whatever fixes are specified in includedFixes if any. If
-  /// neither includedFixes nor includeRequiredFixes is specified, then all
-  /// fixes will be applied. If excludedFixes is specified, then those fixes
-  /// will not be applied regardless of whether they are "required" or specified
-  /// in includedFixes.
+  /// includePedanticFixes is specified, then fixes associated with the pedantic
+  /// rule set will be applied in addition to whatever fixes are specified in
+  /// includedFixes if any. If neither includedFixes nor includePedanticFixes is
+  /// specified, then no fixes will be applied. If excludedFixes is specified,
+  /// then those fixes will not be applied regardless of whether they are
+  /// specified in includedFixes.
   @experimental
   Future<DartfixResult> dartfix(List<String> included,
       {List<String> includedFixes,
       bool includePedanticFixes,
-      bool includeRequiredFixes,
       List<String> excludedFixes,
       int port,
       String outputDir}) {
@@ -1658,9 +1667,6 @@ class EditDomain extends Domain {
     if (includedFixes != null) m['includedFixes'] = includedFixes;
     if (includePedanticFixes != null) {
       m['includePedanticFixes'] = includePedanticFixes;
-    }
-    if (includeRequiredFixes != null) {
-      m['includeRequiredFixes'] = includeRequiredFixes;
     }
     if (excludedFixes != null) m['excludedFixes'] = excludedFixes;
     if (port != null) m['port'] = port;
@@ -1670,6 +1676,11 @@ class EditDomain extends Domain {
 
   /// Return the set of fixes that are available for the errors at a given
   /// offset in a given file.
+  ///
+  /// If a request is made for a file which does not exist, or which is not
+  /// currently subject to analysis (e.g. because it is not associated with any
+  /// analysis root specified to analysis.setAnalysisRoots), an error of type
+  /// `GET_FIXES_INVALID_FILE` will be generated.
   Future<FixesResult> getFixes(String file, int offset) {
     final Map m = {'file': file, 'offset': offset};
     return _call('edit.getFixes', m).then(FixesResult.parse);
@@ -1767,7 +1778,7 @@ class EditDomain extends Domain {
 
   /// Organizes all of the directives - removes unused imports and sorts
   /// directives of the given Dart file according to the (Dart Style
-  /// Guide)[https://www.dartlang.org/articles/style-guide/].
+  /// Guide)[https://dart.dev/guides/language/effective-dart/style].
   ///
   /// If a request is made for a file that does not exist, does not belong to an
   /// analysis root or is not a Dart file, `FILE_NOT_ANALYZED` will be
@@ -1836,6 +1847,24 @@ class DartfixInfoResult {
   final List<DartFix> fixes;
 
   DartfixInfoResult(this.fixes);
+}
+
+class BulkFixesResult {
+  static BulkFixesResult parse(Map m) => new BulkFixesResult(
+      m['edits'] == null
+          ? null
+          : new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
+      m['details'] == null
+          ? null
+          : new List.from(m['details'].map((obj) => BulkFix.parse(obj))));
+
+  /// A list of source edits to apply the recommended changes.
+  final List<SourceFileEdit> edits;
+
+  /// Details that summarize the fixes associated with the recommended changes.
+  final List<BulkFix> details;
+
+  BulkFixesResult(this.edits, this.details);
 }
 
 class DartfixResult {
@@ -2415,6 +2444,10 @@ class FlutterDomain extends Domain {
   ///
   /// If the location does not have a support widget, an error of type
   /// `FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET` will be generated.
+  ///
+  /// If a change to a file happens while widget descriptions are computed, an
+  /// error of type `FLUTTER_GET_WIDGET_DESCRIPTION_CONTENT_MODIFIED` will be
+  /// generated.
   @experimental
   Future<WidgetDescriptionResult> getWidgetDescription(
       String file, int offset) {
@@ -2841,6 +2874,43 @@ class AvailableSuggestionSet {
   AvailableSuggestionSet(this.id, this.uri, this.items);
 }
 
+/// A description of bulk fixes to a library.
+class BulkFix {
+  static BulkFix parse(Map m) {
+    if (m == null) return null;
+    return new BulkFix(
+        m['path'],
+        m['fixes'] == null
+            ? null
+            : new List.from(m['fixes'].map((obj) => BulkFixDetail.parse(obj))));
+  }
+
+  /// The path of the library.
+  final String path;
+
+  /// A list of bulk fix details.
+  final List<BulkFixDetail> fixes;
+
+  BulkFix(this.path, this.fixes);
+}
+
+/// A description of a fix applied to a library.
+class BulkFixDetail {
+  static BulkFixDetail parse(Map m) {
+    if (m == null) return null;
+    return new BulkFixDetail(m['code'], m['occurrences']);
+  }
+
+  /// The code of the diagnostic associated with the fix.
+  final String code;
+
+  /// The number times the associated diagnostic was fixed in the associated
+  /// source edit.
+  final int occurrences;
+
+  BulkFixDetail(this.code, this.occurrences);
+}
+
 /// A directive to modify an existing file content overlay. One or more ranges
 /// of text are deleted from the old file content overlay and replaced with new
 /// text.
@@ -3123,8 +3193,7 @@ class ContextData {
 class DartFix {
   static DartFix parse(Map m) {
     if (m == null) return null;
-    return new DartFix(m['name'],
-        description: m['description'], isRequired: m['isRequired']);
+    return new DartFix(m['name'], description: m['description']);
   }
 
   /// The name of the fix.
@@ -3134,11 +3203,7 @@ class DartFix {
   @optional
   final String description;
 
-  /// `true` if the fix is in the "required" fixes group.
-  @optional
-  final bool isRequired;
-
-  DartFix(this.name, {this.description, this.isRequired});
+  DartFix(this.name, {this.description});
 }
 
 /// A suggestion from an edit.dartfix request.
@@ -4165,7 +4230,8 @@ class NavigationTarget {
   static NavigationTarget parse(Map m) {
     if (m == null) return null;
     return new NavigationTarget(m['kind'], m['fileIndex'], m['offset'],
-        m['length'], m['startLine'], m['startColumn']);
+        m['length'], m['startLine'], m['startColumn'],
+        codeOffset: m['codeOffset'], codeLength: m['codeLength']);
   }
 
   /// The kind of the element.
@@ -4175,22 +4241,31 @@ class NavigationTarget {
   /// to.
   final int fileIndex;
 
-  /// The offset of the region to which the user can navigate.
+  /// The offset of the name of the target to which the user can navigate.
   final int offset;
 
-  /// The length of the region to which the user can navigate.
+  /// The length of the name of the target to which the user can navigate.
   final int length;
 
-  /// The one-based index of the line containing the first character of the
-  /// region.
+  /// The one-based index of the line containing the first character of the name
+  /// of the target.
   final int startLine;
 
   /// The one-based index of the column containing the first character of the
-  /// region.
+  /// name of the target.
   final int startColumn;
 
+  /// The offset of the target code to which the user can navigate.
+  @optional
+  final int codeOffset;
+
+  /// The length of the target code to which the user can navigate.
+  @optional
+  final int codeLength;
+
   NavigationTarget(this.kind, this.fileIndex, this.offset, this.length,
-      this.startLine, this.startColumn);
+      this.startLine, this.startColumn,
+      {this.codeOffset, this.codeLength});
 
   String toString() =>
       '[NavigationTarget kind: ${kind}, fileIndex: ${fileIndex}, offset: ${offset}, length: ${length}, startLine: ${startLine}, startColumn: ${startColumn}]';
