@@ -11,7 +11,7 @@ void main() => defineTests();
 
 void defineTests() {
   group('analysis', () {
-    ServerHelper helper;
+    late ServerHelper helper;
 
     setUp(() async {
       helper = await ServerHelper.create();

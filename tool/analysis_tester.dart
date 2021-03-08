@@ -42,7 +42,7 @@ Future main(List<String> args) async {
 
     print('analysis status: ${status.analysis}');
 
-    if (!status.analysis.isAnalyzing) {
+    if (!status.analysis!.isAnalyzing) {
       client.server.shutdown();
     }
   });
