@@ -13,7 +13,7 @@ jobs:
         sdk: ['stable']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: dart-lang/setup-dart@v0.3
+      - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}
       - uses: actions/checkout@v2
@@ -22,7 +22,7 @@ jobs:
       # Verify the library re-generates.
       - run: dart --enable-asserts tool/generate_analysis.dart
       # Verify that the libraries are error free.
-      - run: dart analyze --fatal-infos --fatal-warnings .
+      - run: dart analyze --fatal-infos .
       # Run the tests.
       - run: dart test
       # Run a basic smoke test.
