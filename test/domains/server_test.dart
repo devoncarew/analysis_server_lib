@@ -9,7 +9,7 @@ void main() => defineTests();
 
 void defineTests() {
   group('server', () {
-    AnalysisServer client;
+    AnalysisServer? client;
 
     setUp(() async {
       client = await AnalysisServer.create();
@@ -20,18 +20,18 @@ void defineTests() {
     });
 
     test('onConnected', () async {
-      await client.server.onConnected.first;
+      await client!.server.onConnected.first;
     });
 
     test('getVersion', () async {
-      VersionResult result = await client.server.getVersion();
+      VersionResult result = await client!.server.getVersion();
       expect(result.version, isNotEmpty);
       expect(result.version, startsWith('1.'));
     });
 
     test('shutdown', () async {
-      await client.server.shutdown();
-      int exitCode = await client.processCompleter.future;
+      await client!.server.shutdown();
+      int exitCode = await client!.processCompleter.future;
       client = null;
 
       expect(exitCode, 0);

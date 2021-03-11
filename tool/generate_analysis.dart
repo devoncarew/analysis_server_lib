@@ -11,20 +11,19 @@ import 'package:html/parser.dart' show parse;
 
 import 'src/src_gen.dart';
 
-Api api;
+late Api api;
 
 void main(List<String> args) {
   // Parse spec_input.html into a model.
   File file = new File('tool/spec_input.html');
   Document document = parse(file.readAsStringSync());
   print('Parsed ${file.path}.');
-  Element ver = document.body.querySelector('version');
-  List<Element> domains = document.body.getElementsByTagName('domain');
-  List<Element> typedefs = document.body
-      .getElementsByTagName('types')
-      .first
-      .getElementsByTagName('type');
-  List<Element> refactorings = document.body
+  Element body = document.body!;
+  Element ver = body.querySelector('version')!;
+  List<Element> domains = body.getElementsByTagName('domain');
+  List<Element> typedefs =
+      body.getElementsByTagName('types').first.getElementsByTagName('type');
+  List<Element> refactorings = body
       .getElementsByTagName('refactorings')
       .first
       .getElementsByTagName('refactoring');
@@ -33,16 +32,14 @@ void main(List<String> args) {
   File commonTypesFile = new File('tool/common_types_spec.html');
   Document commonTypesDoc = parse(commonTypesFile.readAsStringSync());
   print('Parsed ${commonTypesFile.path}.');
-  List<Element> commonTypedefs = commonTypesDoc.body
+  List<Element> commonTypedefs = commonTypesDoc.body!
       .getElementsByTagName('types')
       .first
       .getElementsByTagName('type');
 
-  List<Element> combinedTypeDefs = new List()
-    ..addAll(typedefs)
-    ..addAll(commonTypedefs);
+  List<Element> combinedTypeDefs = [...typedefs, ...commonTypedefs];
   combinedTypeDefs.sort((Element a, Element b) {
-    return a.attributes['name'].compareTo(b.attributes['name']);
+    return a.attributes['name']!.compareTo(b.attributes['name']!);
   });
 
   api = new Api(ver.text);
@@ -53,17 +50,20 @@ void main(List<String> args) {
   DartGenerator generator = new DartGenerator();
   api.generate(generator);
   outputFile.writeAsStringSync(generator.toString());
-  Process.runSync(
-      'dartfmt${Platform.isWindows ? ".bat" : ""}', ['-w', outputFile.path]);
+  var dartFmtResult =
+      Process.runSync(Platform.executable, ['format', outputFile.path]);
+  if (dartFmtResult.exitCode != 0) {
+    throw Exception(dartFmtResult.stderr);
+  }
   print('Wrote ${outputFile.path}.');
 }
 
 class Api {
   final String version;
 
-  List<Domain> domains;
-  List<TypeDef> typedefs;
-  List<Refactoring> refactorings;
+  late List<Domain> domains;
+  late List<TypeDef> typedefs;
+  late List<Refactoring> refactorings;
 
   Api(this.version);
 
@@ -117,10 +117,10 @@ main() async {
     gen.writeStatement('class AnalysisServer {');
     gen.writeln(_staticFactory);
     gen.writeStatement('final Completer<int> processCompleter;');
-    gen.writeStatement('final Function _processKillHandler;');
+    gen.writeStatement('final Function? _processKillHandler;');
     gen.writeln();
-    gen.writeStatement('StreamSubscription _streamSub;');
-    gen.writeStatement('Function _writeMessage;');
+    gen.writeStatement('StreamSubscription? _streamSub;');
+    gen.writeStatement('late Function _writeMessage;');
     gen.writeStatement('int _id = 0;');
     gen.writeStatement('Map<String, Completer> _completers = {};');
     gen.writeStatement('Map<String, String> _methodNames = {};');
@@ -131,19 +131,16 @@ main() async {
         "StreamController<String> _onSend = new StreamController.broadcast();");
     gen.writeln(
         "StreamController<String> _onReceive = new StreamController.broadcast();");
-    gen.writeln("MethodSend _willSend;");
+    gen.writeln("MethodSend? _willSend;");
     gen.writeln();
-    domains.forEach(
-        (Domain domain) => gen.writeln('${domain.className} _${domain.name};'));
+    domains.forEach((Domain domain) => gen.writeln(
+        'late final ${domain.className} _${domain.name} = ${domain.className}(this);'));
     gen.writeln();
     gen.writeDocs('Connect to an existing analysis server instance.');
     gen.writeStatement(
         'AnalysisServer(Stream<String> inStream, void writeMessage(String message), \n'
         'this.processCompleter, [this._processKillHandler]) {');
     gen.writeStatement('configure(inStream, writeMessage);');
-    gen.writeln();
-    domains.forEach((Domain domain) =>
-        gen.writeln('_${domain.name} = new ${domain.className}(this);'));
     gen.writeln('}');
     gen.writeln();
     domains.forEach((Domain domain) => gen
@@ -185,8 +182,7 @@ main() async {
 
     gen.writeStatement('abstract class RefactoringFeedback {');
     gen.writeStatement(
-        'static RefactoringFeedback parse(String kind, Map m) {');
-    gen.writeStatement('if (m == null) return null;');
+        'static RefactoringFeedback? parse(String? kind, Map m) {');
     gen.writeln();
     gen.writeStatement('switch (kind) {');
     refactorings.forEach((Refactoring refactor) {
@@ -219,7 +215,7 @@ main() async {
         }
 
         if (field.optional) {
-          return "${field.name}: ${field.type.jsonConvert(val)}";
+          return "${field.name}: ${field.type.jsonConvert(val, isOptional: true)}";
         } else {
           return field.type.jsonConvert(val);
         }
@@ -232,8 +228,8 @@ main() async {
         } else {
           gen.writeDocs(field.docs);
         }
-        if (field.optional) gen.write('@optional ');
-        gen.writeln('final ${field.type} ${field.name};');
+        gen.writeln(
+            'final ${field.type}${field.optional ? '?' : ''} ${field.name};');
       });
       gen.writeln();
       gen.write('${name}(');
@@ -258,15 +254,15 @@ main() async {
 
 class Domain {
   bool experimental = false;
-  String name;
-  String docs;
+  late String name;
+  String? docs;
 
-  List<Request> requests;
-  List<Notification> notifications;
+  late List<Request> requests;
+  late List<Notification> notifications;
   Map<String, List<Field>> resultClasses = new LinkedHashMap();
 
   Domain(Element element) {
-    name = element.attributes['name'];
+    name = element.attributes['name']!;
     experimental = element.attributes.containsKey('experimental');
     docs = _collectDocs(element);
     requests = element
@@ -304,12 +300,12 @@ class Domain {
 
     // Result classes
     for (String name in resultClasses.keys) {
-      List<Field> fields = resultClasses[name];
+      List<Field> fields = resultClasses[name]!;
 
       gen.writeln();
       gen.writeStatement('class ${name} {');
       if (name == 'RefactoringResult') {
-        gen.write('static ${name} parse(String kind, Map m) => ');
+        gen.write('static ${name}? parse(String? kind, Map m) => ');
       } else {
         gen.write('static ${name} parse(Map m) => ');
       }
@@ -321,7 +317,7 @@ class Domain {
         }
 
         if (field.optional) {
-          return "${field.name}: ${field.type.jsonConvert(val)}";
+          return "${field.name}: ${field.type.jsonConvert(val, isOptional: true)}";
         } else {
           return field.type.jsonConvert(val);
         }
@@ -334,8 +330,8 @@ class Domain {
         } else {
           gen.writeDocs(field.docs);
         }
-        if (field.optional) gen.write('@optional ');
-        gen.writeln('final ${field.type} ${field.name};');
+        gen.writeln(
+            'final ${field.type}${field.optional ? '?' : ''} ${field.name};');
       });
       gen.writeln();
       gen.write('${name}(');
@@ -361,10 +357,10 @@ class Domain {
 class Request {
   final Domain domain;
 
-  bool experimental;
-  bool deprecated;
-  String method;
-  String docs;
+  late bool experimental;
+  late bool deprecated;
+  late String method;
+  String? docs;
 
   List<Field> args = [];
   List<Field> results = [];
@@ -372,7 +368,7 @@ class Request {
   Request(this.domain, Element element) {
     experimental = element.attributes.containsKey('experimental');
     deprecated = element.attributes.containsKey('deprecated');
-    method = element.attributes['method'];
+    method = element.attributes['method']!;
     docs = _collectDocs(element);
 
     List paramsList = element.getElementsByTagName('params');
@@ -435,6 +431,10 @@ class Request {
     if (results.isEmpty) {
       gen.write('Future ${method}(');
     } else {
+      String resultName = this.resultName;
+      if (const ['RefactoringResult'].contains(resultName)) {
+        resultName += '?';
+      }
       gen.write('Future<${resultName}> ${method}(');
     }
     gen.write(args.map((arg) {
@@ -442,7 +442,7 @@ class Request {
       if (arg.optional && args.firstWhere((a) => a.optional) == arg) {
         buf.write('{');
       }
-      buf.write('${arg.type} ${arg.name}');
+      buf.write('${arg.type}? ${arg.name}');
       if (arg.optional && args.lastWhere((a) => a.optional) == arg) {
         buf.write('}');
       }
@@ -501,12 +501,12 @@ class Notification {
   static Set<String> disambiguateEvents = new Set.from(['FlutterOutline']);
 
   final Domain domain;
-  String event;
-  String docs;
-  List<Field> fields;
+  late String event;
+  String? docs;
+  late List<Field> fields;
 
   Notification(this.domain, Element element) {
-    event = element.attributes['event'];
+    event = element.attributes['event']!;
     docs = _collectDocs(element);
     fields = new List.from(
         element.getElementsByTagName('field').map((field) => new Field(field)));
@@ -540,7 +540,7 @@ class Notification {
     gen.write(fields.map((Field field) {
       String val = "m['${field.name}']";
       if (field.optional) {
-        return "${field.name}: ${field.type.jsonConvert(val)}";
+        return "${field.name}: ${field.type.jsonConvert(val, isOptional: true)}";
       } else {
         return field.type.jsonConvert(val);
       }
@@ -554,8 +554,8 @@ class Notification {
         } else {
           gen.writeDocs(field.docs);
         }
-        if (field.optional) gen.write('@optional ');
-        gen.writeln('final ${field.type} ${field.name};');
+        gen.writeln(
+            'final ${field.type}${field.optional ? '?' : ''} ${field.name};');
       });
     }
     gen.writeln();
@@ -577,14 +577,14 @@ class Notification {
 }
 
 class Field implements Comparable {
-  String name;
-  String docs;
-  bool optional;
-  bool deprecated;
-  Type type;
+  late String name;
+  String? docs;
+  late bool optional;
+  late bool deprecated;
+  late Type type;
 
   Field(Element element) {
-    name = element.attributes['name'];
+    name = element.attributes['name']!;
     docs = _collectDocs(element);
     optional = element.attributes['optional'] == 'true';
     deprecated = element.attributes.containsKey('deprecated');
@@ -604,30 +604,30 @@ class Field implements Comparable {
     return 0;
   }
 
-  void generate(DartGenerator gen) {
+  void generate(DartGenerator gen, {bool forceOptional = false}) {
     if (deprecated) {
       gen.writeln('@deprecated');
     } else {
       gen.writeDocs(docs);
     }
-    if (optional) gen.write('@optional ');
-    gen.writeStatement('final ${type} ${name};');
+    gen.writeStatement(
+        'final ${type}${optional || forceOptional ? '?' : ''} ${name};');
   }
 }
 
 class Refactoring {
-  String kind;
-  String docs;
+  late String kind;
+  String? docs;
   List<Field> optionsFields = [];
   List<Field> feedbackFields = [];
 
   Refactoring(Element element) {
-    kind = element.attributes['kind'];
+    kind = element.attributes['kind']!;
     docs = _collectDocs(element);
 
     // Parse <options>
     // <field name="deleteSource"><ref>bool</ref></field>
-    Element options = element.querySelector('options');
+    Element? options = element.querySelector('options');
     if (options != null) {
       optionsFields = new List.from(options
           .getElementsByTagName('field')
@@ -636,7 +636,7 @@ class Refactoring {
 
     // Parse <feedback>
     // <field name="className" optional="true"><ref>String</ref></field>
-    Element feedback = element.querySelector('feedback');
+    Element? feedback = element.querySelector('feedback');
     if (feedback != null) {
       feedbackFields = new List.from(feedback
           .getElementsByTagName('field')
@@ -659,7 +659,7 @@ class Refactoring {
           'class ${className}RefactoringOptions extends RefactoringOptions {');
       // fields
       for (Field field in optionsFields) {
-        field.generate(gen);
+        field.generate(gen, forceOptional: true);
       }
 
       gen.writeln();
@@ -698,16 +698,16 @@ class TypeDef {
   static final Set<String> _shouldHaveEquals =
       new Set.from(['Location', 'AnalysisError']);
 
-  String name;
-  bool experimental;
-  bool deprecated;
-  String docs;
+  late String name;
+  late bool experimental;
+  late bool deprecated;
+  String? docs;
   bool isString = false;
-  List<Field> fields;
+  List<Field>? fields;
   bool _callParam = false;
 
   TypeDef(Element element) {
-    name = element.attributes['name'];
+    name = element.attributes['name']!;
     experimental = element.attributes.containsKey('experimental');
     deprecated = element.attributes.containsKey('deprecated');
     docs = _collectDocs(element);
@@ -718,8 +718,8 @@ class TypeDef {
     if (tags.contains('object')) {
       Element object = element.getElementsByTagName('object').first;
       fields = new List.from(
-          object.getElementsByTagName('field').map((f) => new Field(f)));
-      fields.sort();
+          object.getElementsByTagName('field').map((f) => new Field(f)))
+        ..sort();
     } else if (tags.contains('enum')) {
       isString = true;
     } else if (tags.contains('ref')) {
@@ -753,7 +753,8 @@ class TypeDef {
     }
 
     bool isContentOverlay = name.endsWith('ContentOverlay');
-    List<Field> _fields = fields;
+    List<Field> _fields = this.fields!;
+    List<Field> fields = _fields;
     if (isContentOverlay) {
       _fields = _fields.toList()..removeAt(0);
     }
@@ -770,12 +771,11 @@ class TypeDef {
     if (callParam) gen.write(' implements Jsonable');
     gen.writeln(' {');
     gen.writeln('static ${name} parse(Map m) {');
-    gen.writeln('if (m == null) return null;');
     gen.write('return new ${name}(');
     gen.write(_fields.map((Field field) {
       String val = "m['${field.name}']";
       if (field.optional) {
-        return "${field.name}: ${field.type.jsonConvert(val)}";
+        return "${field.name}: ${field.type.jsonConvert(val, isOptional: true)}";
       } else {
         return field.type.jsonConvert(val);
       }
@@ -792,8 +792,8 @@ class TypeDef {
           gen.write('@deprecated ');
         }
 
-        if (field.optional) gen.write('@optional ');
-        gen.writeln('final ${field.type} ${field.name};');
+        gen.writeln(
+            'final ${field.type}${field.optional ? '?' : ''} ${field.name};');
       });
     }
 
@@ -889,7 +889,7 @@ abstract class Type {
     }
   }
 
-  String jsonConvert(String ref);
+  String jsonConvert(String ref, {bool isOptional = false});
 
   void setCallParam();
 
@@ -907,16 +907,20 @@ class ListType extends Type {
 
   String get typeName => 'List<${subType.typeName}>';
 
-  String jsonConvert(String ref) {
+  String jsonConvert(String ref, {bool isOptional = false}) {
     if (subType is PrimitiveType) {
-      return "${ref} == null ? null : new List.from(${ref})";
+      String code = 'new List.from(${ref})';
+      return isOptional ? "${ref} == null ? null : $code" : code;
     }
 
     if (subType is RefType && (subType as RefType).isString) {
-      return "${ref} == null ? null : new List.from(${ref})";
+      String code = 'new List.from(${ref})';
+      return isOptional ? "${ref} == null ? null : $code" : code;
     }
 
-    return "${ref} == null ? null : new List.from(${ref}.map((obj) => ${subType.jsonConvert('obj')}))";
+    String code =
+        'new List.from(${ref}.map((obj) => ${subType.jsonConvert('obj', isOptional: false)}))';
+    return isOptional ? "${ref} == null ? null : $code" : code;
   }
 
   void setCallParam() => subType.setCallParam();
@@ -926,14 +930,13 @@ class MapType extends Type {
   Type key;
   Type value;
 
-  MapType(Element keyElement, Element valueElement) {
-    key = Type.create(keyElement);
-    value = Type.create(valueElement);
-  }
+  MapType(Element keyElement, Element valueElement)
+      : key = Type.create(keyElement),
+        value = Type.create(valueElement);
 
   String get typeName => 'Map<${key.typeName}, ${value.typeName}>';
 
-  String jsonConvert(String ref) => ref;
+  String jsonConvert(String ref, {bool isOptional = false}) => ref;
 
   void setCallParam() {
     key.setCallParam();
@@ -943,34 +946,43 @@ class MapType extends Type {
 
 class RefType extends Type {
   String text;
-  TypeDef ref;
+  TypeDef? ref;
 
   RefType(this.text);
 
   bool get isString {
-    if (ref == null) _resolve();
+    if (this.ref == null) _resolve();
+    TypeDef ref = this.ref!;
     return ref.isString;
   }
 
   String get typeName {
-    if (ref == null) _resolve();
+    if (this.ref == null) _resolve();
+    TypeDef ref = this.ref!;
     return ref.isString ? 'String' : ref.name;
   }
 
-  String jsonConvert(String r) {
-    if (ref == null) _resolve();
+  String jsonConvert(String r, {bool isOptional = false}) {
+    if (this.ref == null) _resolve();
+    TypeDef ref = this.ref!;
     if (ref.name == 'RefactoringFeedback') {
       return '${ref.name}.parse(kind, ${r})';
     }
-    return ref.isString ? r : '${ref.name}.parse(${r})';
+    if (ref.isString) {
+      return r;
+    } else {
+      String code = '${ref.name}.parse($r)';
+      return isOptional ? '$r == null ? null : $code' : code;
+    }
   }
 
   void setCallParam() {
-    if (ref == null) _resolve();
+    if (this.ref == null) _resolve();
+    TypeDef ref = this.ref!;
     ref.setCallParam();
   }
 
-  bool isCallParam() => ref.isCallParam();
+  bool isCallParam() => ref!.isCallParam();
 
   void _resolve() {
     try {
@@ -989,7 +1001,7 @@ class PrimitiveType extends Type {
 
   String get typeName => type == 'long' ? 'int' : type;
 
-  String jsonConvert(String ref) => ref;
+  String jsonConvert(String ref, {bool isOptional = false}) => ref;
 
   void setCallParam() {}
 }
@@ -1018,7 +1030,7 @@ class _ConcatTextVisitor extends TreeVisitor {
 
 final RegExp _wsRegexp = new RegExp(r'\s+', multiLine: true);
 
-String _collectDocs(Element element) {
+String? _collectDocs(Element element) {
   String str =
       element.children.where((e) => e.localName == 'p').map((Element e) {
     _ConcatTextVisitor visitor = new _ConcatTextVisitor();
@@ -1047,9 +1059,6 @@ import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 
-/// @optional
-const String optional = 'optional';
-
 /// @experimental
 const String experimental = 'experimental';
 
@@ -1066,11 +1075,11 @@ final String _staticFactory = r'''
   /// - [onRead] called every time data is read from the server
   /// - [onWrite] called every time data is written to the server
   static Future<AnalysisServer> create(
-      {String sdkPath, String scriptPath,
-       void onRead(String str), void onWrite(String str),
-       List<String> vmArgs, List<String> serverArgs,
-       String clientId, String clientVersion,
-      Map<String, String> processEnvironment}) async {
+      {String? sdkPath, String? scriptPath,
+       void Function(String str)? onRead, void Function(String str)? onWrite,
+       List<String>? vmArgs, List<String>? serverArgs,
+       String? clientId, String? clientVersion,
+      Map<String, String>? processEnvironment}) async {
     Completer<int> processCompleter = new Completer();
 
     String vmPath;
@@ -1124,12 +1133,12 @@ final String _serverCode = r'''
   }
 
   void dispose() {
-    if (_streamSub != null) _streamSub.cancel();
+    if (_streamSub != null) _streamSub!.cancel();
     //_completers.values.forEach((c) => c.completeError('disposed'));
     _completers.clear();
 
     if (_processKillHandler != null) {
-      _processKillHandler();
+      _processKillHandler!();
     }
   }
 
@@ -1146,7 +1155,7 @@ final String _serverCode = r'''
 
       if (json['id'] == null) {
         // Handle a notification.
-        String event = json['event'];
+        String? event = json['event'];
         if (event == null) {
           _logger.severe('invalid message: ${message}');
         } else {
@@ -1154,19 +1163,19 @@ final String _serverCode = r'''
           if (_domains[prefix] == null) {
             _logger.severe('no domain for notification: ${message}');
           } else {
-            _domains[prefix]._handleEvent(event, json['params']);
+            _domains[prefix]!._handleEvent(event, json['params']);
           }
         }
       } else {
-        Completer completer = _completers.remove(json['id']);
-        String methodName = _methodNames.remove(json['id']);
+        Completer? completer = _completers.remove(json['id']);
+        String? methodName = _methodNames.remove(json['id']);
 
         if (completer == null) {
           _logger.severe('unmatched request response: ${message}');
         } else if (json['error'] != null) {
-          completer.completeError(RequestError.parse(methodName, json['error']));
+          completer.completeError(RequestError.parse(methodName!, json['error']));
         } else {
-          completer.complete(json['result']);
+          completer.complete(json['result'] ?? const {});
         }
       }
     } catch (e) {
@@ -1174,17 +1183,17 @@ final String _serverCode = r'''
     }
   }
 
-  Future<Map> _call(String method, [Map args]) {
+  Future<Map> _call(String method, [Map? args]) {
     String id = '${++_id}';
-    _completers[id] = new Completer<Map>();
+    Completer<Map> completer = _completers[id] = new Completer<Map>();
     _methodNames[id] = method;
     final Map m = {'id': id, 'method': method};
     if (args != null) m['params'] = args;
     String message = _jsonEncoder.encode(m);
-    if (_willSend != null) _willSend(method);
+    if (_willSend != null) _willSend!(method);
     _onSend.add(message);
     _writeMessage(message);
-    return _completers[id].future;
+    return completer.future;
   }
 
   static dynamic _toEncodable(obj) => obj is Jsonable ? obj.toMap() : obj;
@@ -1202,20 +1211,21 @@ abstract class Domain {
     server._domains[name] = this;
   }
 
-  Future<Map> _call(String method, [Map args]) => server._call(method, args);
+  Future<Map> _call(String method, [Map? args]) => server._call(method, args);
 
   Stream<E> _listen<E>(String name, E cvt(Map m)) {
     if (_streams[name] == null) {
-      _controllers[name] = new StreamController<Map>.broadcast();
-      _streams[name] = _controllers[name].stream.map<E>(cvt);
+      StreamController<Map> controller = _controllers[name] = new StreamController<Map>.broadcast();
+      _streams[name] = controller.stream.map<E>(cvt);
     }
 
-    return _streams[name];
+    return _streams[name] as Stream<E>;
   }
 
   void _handleEvent(String name, dynamic event) {
-    if (_controllers[name] != null) {
-      _controllers[name].add(event);
+    StreamController? controller = _controllers[name];
+    if (controller != null) {
+      controller.add(event);
     }
   }
 
@@ -1237,14 +1247,13 @@ abstract class ContentOverlayType {
 
 class RequestError {
   static RequestError parse(String method, Map m) {
-    if (m == null) return null;
     return new RequestError(method, m['code'], m['message'], stackTrace: m['stackTrace']);
   }
 
   final String method;
   final String code;
   final String message;
-  @optional final String stackTrace;
+  final String? stackTrace;
 
   RequestError(this.method, this.code, this.message, {this.stackTrace});
 

@@ -17,9 +17,8 @@ class ServerHelper {
   Directory tempDir;
   Map<String, List<AnalysisError>> errors = {};
 
-  ServerHelper(this.server) {
-    tempDir = Directory.systemTemp.createTempSync('tests');
-  }
+  ServerHelper(this.server)
+      : tempDir = Directory.systemTemp.createTempSync('tests');
 
   Future init() {
     server.analysis.onErrors.listen((AnalysisErrors e) {
@@ -36,7 +35,7 @@ class ServerHelper {
 
   Stream get onAnalysisFinished {
     return server.server.onStatus.where((ServerStatus status) {
-      return status.analysis != null && status.analysis.isAnalyzing == false;
+      return status.analysis != null && status.analysis!.isAnalyzing == false;
     });
   }
 

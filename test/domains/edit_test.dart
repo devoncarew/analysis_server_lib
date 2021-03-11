@@ -11,7 +11,7 @@ void main() => defineTests();
 
 void defineTests() {
   group('edit', () {
-    ServerHelper helper;
+    late ServerHelper helper;
 
     setUp(() async {
       helper = await ServerHelper.create();
@@ -28,9 +28,7 @@ void defineTests() {
       FormatResult result = await helper.server.edit.format(main, 0, 0);
       expect(result.edits, hasLength(1));
       SourceEdit edit = result.edits.first;
-      expect(
-          edit.replacement,
-          '''
+      expect(edit.replacement, '''
 main() {
   print('hello');
 }
@@ -40,7 +38,7 @@ main() {
     test('getRefactoring', () async {
       await helper.init();
       String main = await helper.createFile('main.dart', "foo() { }");
-      RefactoringResult result = await helper.server.edit.getRefactoring(
+      RefactoringResult? result = await helper.server.edit.getRefactoring(
         Refactorings.RENAME,
         main,
         0,
@@ -49,18 +47,19 @@ main() {
         options: new RenameRefactoringOptions(newName: 'bar'),
       );
 
-      expect(result.initialProblems, isEmpty);
+      expect(result!.initialProblems, isEmpty);
       expect(result.optionsProblems, isEmpty);
       expect(result.finalProblems, isEmpty);
 
       // feedback
-      RenameFeedback feedback = result.feedback;
+      RenameFeedback feedback = result.feedback as RenameFeedback;
       expect(feedback, isNotNull);
       expect(feedback.oldName, 'foo');
 
       // edits
-      expect(result.change.edits, hasLength(1));
-      SourceFileEdit fileEdit = result.change.edits.first;
+      SourceChange change = result.change!;
+      expect(change.edits, hasLength(1));
+      SourceFileEdit fileEdit = change.edits.first;
       expect(fileEdit.edits, hasLength(1));
       expect(fileEdit.edits.first.replacement, 'bar');
 

@@ -16,12 +16,12 @@ String titleCase(String str) =>
     str.substring(0, 1).toUpperCase() + str.substring(1);
 
 /// FOO ==> Foo
-String forceTitleCase(String str) {
+String? forceTitleCase(String? str) {
   if (str == null || str.isEmpty) return str;
   return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
 }
 
-String joinLast(Iterable<String> strs, String join, [String last]) {
+String joinLast(Iterable<String> strs, String join, [String? last]) {
   if (strs.isEmpty) return '';
   List list = strs.toList();
   if (list.length == 1) return list.first;
@@ -58,7 +58,7 @@ class DartGenerator {
 
   /// Write out the given dartdoc text, wrapping lines as necessary to flow
   /// along the column boundary.
-  void writeDocs(String docs) {
+  void writeDocs(String? docs) {
     if (docs == null) return;
 
     docs = wrap(docs.trim(), colBoundary - _indent.length - 4);
