@@ -101,10 +101,10 @@ class AnalysisServer {
   }
 
   final Completer<int> processCompleter;
-  final Function? _processKillHandler;
+  final void Function()? _processKillHandler;
 
   StreamSubscription? _streamSub;
-  late Function _writeMessage;
+  late void Function(String) _writeMessage;
   int _id = 0;
   Map<String, Completer> _completers = {};
   Map<String, String> _methodNames = {};
@@ -126,7 +126,7 @@ class AnalysisServer {
   late final FlutterDomain _flutter = FlutterDomain(this);
 
   /// Connect to an existing analysis server instance.
-  AnalysisServer(Stream<String> inStream, void writeMessage(String message),
+  AnalysisServer(Stream<String> inStream, void Function(String) writeMessage,
       this.processCompleter,
       [this._processKillHandler]) {
     configure(inStream, writeMessage);
@@ -150,7 +150,7 @@ class AnalysisServer {
     _willSend = fn;
   }
 
-  void configure(Stream<String> inStream, void writeMessage(String message)) {
+  void configure(Stream<String> inStream, void Function(String) writeMessage) {
     _streamSub = inStream.listen(_processMessage);
     _writeMessage = writeMessage;
   }
@@ -236,7 +236,7 @@ abstract class Domain {
 
   Future<Map> _call(String method, [Map? args]) => server._call(method, args);
 
-  Stream<E> _listen<E>(String name, E cvt(Map m)) {
+  Stream<E> _listen<E>(String name, E Function(Map) cvt) {
     if (_streams[name] == null) {
       StreamController<Map> controller =
           _controllers[name] = new StreamController<Map>.broadcast();

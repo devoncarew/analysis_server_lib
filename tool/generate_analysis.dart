@@ -117,10 +117,10 @@ main() async {
     gen.writeStatement('class AnalysisServer {');
     gen.writeln(_staticFactory);
     gen.writeStatement('final Completer<int> processCompleter;');
-    gen.writeStatement('final Function? _processKillHandler;');
+    gen.writeStatement('final void Function()? _processKillHandler;');
     gen.writeln();
     gen.writeStatement('StreamSubscription? _streamSub;');
-    gen.writeStatement('late Function _writeMessage;');
+    gen.writeStatement('late void Function(String) _writeMessage;');
     gen.writeStatement('int _id = 0;');
     gen.writeStatement('Map<String, Completer> _completers = {};');
     gen.writeStatement('Map<String, String> _methodNames = {};');
@@ -138,7 +138,7 @@ main() async {
     gen.writeln();
     gen.writeDocs('Connect to an existing analysis server instance.');
     gen.writeStatement(
-        'AnalysisServer(Stream<String> inStream, void writeMessage(String message), \n'
+        'AnalysisServer(Stream<String> inStream, void Function(String) writeMessage, \n'
         'this.processCompleter, [this._processKillHandler]) {');
     gen.writeStatement('configure(inStream, writeMessage);');
     gen.writeln('}');
@@ -371,14 +371,14 @@ class Request {
     method = element.attributes['method']!;
     docs = _collectDocs(element);
 
-    List paramsList = element.getElementsByTagName('params');
+    List<Element> paramsList = element.getElementsByTagName('params');
     if (paramsList.isNotEmpty) {
       args = new List.from(paramsList.first
           .getElementsByTagName('field')
           .map((field) => new Field(field)));
     }
 
-    List resultsList = element.getElementsByTagName('result');
+    List<Element> resultsList = element.getElementsByTagName('result');
     if (resultsList.isNotEmpty) {
       results = new List.from(resultsList.first
           .getElementsByTagName('field')
@@ -1127,7 +1127,7 @@ final String _serverCode = r'''
     _willSend = fn;
   }
 
-  void configure(Stream<String> inStream, void writeMessage(String message)) {
+  void configure(Stream<String> inStream, void Function(String) writeMessage) {
     _streamSub = inStream.listen(_processMessage);
     _writeMessage = writeMessage;
   }
@@ -1213,7 +1213,7 @@ abstract class Domain {
 
   Future<Map> _call(String method, [Map? args]) => server._call(method, args);
 
-  Stream<E> _listen<E>(String name, E cvt(Map m)) {
+  Stream<E> _listen<E>(String name, E Function(Map) cvt) {
     if (_streams[name] == null) {
       StreamController<Map> controller = _controllers[name] = new StreamController<Map>.broadcast();
       _streams[name] = controller.stream.map<E>(cvt);

@@ -3,3 +3,4 @@ include: package:pedantic/analysis_options.1.7.0.yaml
 linter:
   rules:
     - always_declare_return_types
+    - use_function_type_syntax_for_parameters
