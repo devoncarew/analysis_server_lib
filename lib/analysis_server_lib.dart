@@ -4,6 +4,8 @@
 
 // This is a generated file.
 
+// ignore_for_file: provide_deprecation_message
+
 /// A library to access the analysis server API.
 ///
 /// [AnalysisServer] is the main entry-point to this library.
@@ -23,7 +25,7 @@ final Logger _logger = new Logger('analysis_server');
 
 const String generatedProtocolVersion = '1.32.1';
 
-typedef void MethodSend(String methodName);
+typedef MethodSend = void Function(String methodName);
 
 /// A class to communicate with an analysis server instance.
 ///
