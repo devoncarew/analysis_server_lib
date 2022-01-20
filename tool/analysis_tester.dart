@@ -7,7 +7,6 @@ import 'dart:io';
 
 import 'package:analysis_server_lib/analysis_server_lib.dart';
 import 'package:logging/logging.dart';
-import 'package:pedantic/pedantic.dart';
 
 Future main(List<String> args) async {
   if (args.contains('--mini')) {

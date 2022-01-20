@@ -93,7 +93,7 @@ class Api {
     gen.out(_headerCode);
     gen.writeln("const String generatedProtocolVersion = '${version}';");
     gen.writeln();
-    gen.writeln("typedef void MethodSend(String methodName);");
+    gen.writeln("typedef MethodSend = void Function(String methodName);");
     gen.writeln();
     gen.writeDocs('''
 A class to communicate with an analysis server instance.
@@ -1046,6 +1046,8 @@ final String _headerCode = r'''
 // license that can be found in the LICENSE file.
 
 // This is a generated file.
+
+// ignore_for_file: provide_deprecation_message
 
 /// A library to access the analysis server API.
 ///
