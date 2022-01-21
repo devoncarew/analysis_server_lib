@@ -35,7 +35,7 @@ main() {
 ''');
     });
 
-    test('getRefactoring', () async {
+    test('getRefactoring RENAME', () async {
       await helper.init();
       String main = await helper.createFile('main.dart', "foo() { }");
       RefactoringResult? result = await helper.server.edit.getRefactoring(
@@ -64,6 +64,32 @@ main() {
       expect(fileEdit.edits.first.replacement, 'bar');
 
       expect(result.potentialEdits, isNull);
+    });
+
+    test('getRefactoring MOVE_FILE', () async {
+      await helper.init();
+
+      String main = await helper.createFile('old_main.dart', "foo() { }");
+
+      RefactoringResult? result = await helper.server.edit.getRefactoring(
+        Refactorings.MOVE_FILE,
+        main,
+        0,
+        0,
+        false,
+        options: MoveFileRefactoringOptions(newFile: 'new_main.dart'),
+      );
+
+      expect(result!.initialProblems, isEmpty);
+      expect(result.optionsProblems, isEmpty);
+      expect(result.finalProblems, isEmpty);
+      expect(result.potentialEdits, isNull);
+
+      // edits
+      SourceChange change = result.change!;
+      expect(change.edits, isEmpty);
+      expect(change.linkedEditGroups, isEmpty);
+      expect(change.message, isEmpty);
     });
   });
 }

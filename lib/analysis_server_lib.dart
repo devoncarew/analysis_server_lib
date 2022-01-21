@@ -1854,7 +1854,9 @@ class RefactoringResult {
           m['optionsProblems'].map((obj) => RefactoringProblem.parse(obj))),
       new List.from(
           m['finalProblems'].map((obj) => RefactoringProblem.parse(obj))),
-      feedback: RefactoringFeedback.parse(kind, m['feedback']),
+      feedback: m['feedback'] == null
+          ? null
+          : RefactoringFeedback.parse(kind, m['feedback']),
       change: m['change'] == null ? null : SourceChange.parse(m['change']),
       potentialEdits: m['potentialEdits'] == null
           ? null
