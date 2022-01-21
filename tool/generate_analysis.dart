@@ -966,9 +966,12 @@ class RefType extends Type {
     if (this.ref == null) _resolve();
     TypeDef ref = this.ref!;
     if (ref.name == 'RefactoringFeedback') {
-      return '${ref.name}.parse(kind, ${r})';
-    }
-    if (ref.isString) {
+      if (isOptional) {
+        return '$r == null ? null : ${ref.name}.parse(kind, ${r})';
+      } else {
+        return '${ref.name}.parse(kind, ${r})';
+      }
+    } else if (ref.isString) {
       return r;
     } else {
       String code = '${ref.name}.parse($r)';
