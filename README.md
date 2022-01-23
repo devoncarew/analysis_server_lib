@@ -2,7 +2,7 @@
 
 A library to access Dart's analysis server API.
 
-[![Build Status](https://github.com/devoncarew/analysis_server_lib/workflows/Build/badge.svg?branch=master)](https://github.com/devoncarew/analysis_server_lib)
+[![Buid status](https://github.com/devoncarew/analysis_server_lib/actions/workflows/build.yaml/badge.svg)](https://github.com/devoncarew/analysis_server_lib/actions/workflows/build.yaml)
 
 ## What is the analysis server?
 
