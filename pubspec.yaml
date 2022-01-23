@@ -1,7 +1,7 @@
 name: analysis_server_lib
 description: A library to access Dart's analysis server API.
 
-version: 0.2.1
+version: 0.2.2
 homepage: https://github.com/devoncarew/analysis_server_lib
 
 environment:
