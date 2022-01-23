@@ -23,7 +23,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.32.1';
+const String generatedProtocolVersion = '1.32.8';
 
 typedef MethodSend = void Function(String methodName);
 
@@ -358,6 +358,15 @@ class ServerDomain extends Domain {
   /// unchanged.
   Future setSubscriptions(List<String> subscriptions) =>
       _call('server.setSubscriptions', {'subscriptions': subscriptions});
+
+  /// Requests cancellation of a request sent by the client by id. This is
+  /// provided on a best-effort basis and there is no guarantee the server will
+  /// be able to cancel any specific request. The server will still always
+  /// produce a response to the request even in the case of cancellation, but
+  /// clients should discard any results of any cancelled request because they
+  /// may be incomplete or inaccurate. This request always completes without
+  /// error regardless of whether the request is successfully cancelled.
+  Future cancelRequest(String id) => _call('server.cancelRequest', {'id': id});
 }
 
 class ServerConnected {
@@ -1113,6 +1122,21 @@ class CompletionDomain extends Domain {
     return _call('completion.getSuggestions', m).then(SuggestionsResult.parse);
   }
 
+  /// Request that completion suggestions for the given offset in the given file
+  /// be returned. The suggestions will be filtered using fuzzy matching with
+  /// the already existing prefix.
+  @experimental
+  Future<Suggestions2Result> getSuggestions2(
+      String? file, int? offset, int? maxResults,
+      {String? completionMode, int? invocationCount, int? timeout}) {
+    final Map m = {'file': file, 'offset': offset, 'maxResults': maxResults};
+    if (completionMode != null) m['completionMode'] = completionMode;
+    if (invocationCount != null) m['invocationCount'] = invocationCount;
+    if (timeout != null) m['timeout'] = timeout;
+    return _call('completion.getSuggestions2', m)
+        .then(Suggestions2Result.parse);
+  }
+
   /// Subscribe for completion services. All previous subscriptions are replaced
   /// by the given set of services.
   ///
@@ -1139,14 +1163,24 @@ class CompletionDomain extends Domain {
         .then(SuggestionDetailsResult.parse);
   }
 
-  /// Inspect analysis server's knowledge about all of a file's tokens including
-  /// their lexeme, type, and what element kinds would have been appropriate for
-  /// the token's program location.
+  /// Clients must make this request when the user has selected a completion
+  /// suggestion with the `isNotImported` field set to `true`. The server will
+  /// respond with the text to insert, as well as any `SourceChange` that needs
+  /// to be applied in case the completion requires an additional import to be
+  /// added. The text to insert might be different from the original suggestion
+  /// to include an import prefix if the library will be imported with a prefix
+  /// to avoid shadowing conflicts in the file.
   @experimental
-  Future<ListTokenDetailsResult> listTokenDetails(String? file) {
-    final Map m = {'file': file};
-    return _call('completion.listTokenDetails', m)
-        .then(ListTokenDetailsResult.parse);
+  Future<SuggestionDetails2Result> getSuggestionDetails2(
+      String? file, int? offset, String? completion, String? libraryUri) {
+    final Map m = {
+      'file': file,
+      'offset': offset,
+      'completion': completion,
+      'libraryUri': libraryUri
+    };
+    return _call('completion.getSuggestionDetails2', m)
+        .then(SuggestionDetails2Result.parse);
   }
 }
 
@@ -1276,6 +1310,45 @@ class SuggestionsResult {
   SuggestionsResult(this.id);
 }
 
+class Suggestions2Result {
+  static Suggestions2Result parse(Map m) => new Suggestions2Result(
+      m['replacementOffset'],
+      m['replacementLength'],
+      new List.from(
+          m['suggestions'].map((obj) => CompletionSuggestion.parse(obj))),
+      m['isIncomplete']);
+
+  /// The offset of the start of the text to be replaced. This will be different
+  /// from the offset used to request the completion suggestions if there was a
+  /// portion of an identifier before the original offset. In particular, the
+  /// replacementOffset will be the offset of the beginning of said identifier.
+  final int replacementOffset;
+
+  /// The length of the text to be replaced if the remainder of the identifier
+  /// containing the cursor is to be replaced when the suggestion is applied
+  /// (that is, the number of characters in the existing identifier).
+  final int replacementLength;
+
+  /// The completion suggestions being reported. This list is filtered by the
+  /// already existing prefix, and sorted first by relevance, and (if the same)
+  /// by the suggestion text. The list will have at most `maxResults` items. If
+  /// the user types a new keystroke, the client is expected to either do local
+  /// filtering (when the returned list was complete), or ask the server again
+  /// (if `isIncomplete` was `true`).
+  ///
+  /// This list contains suggestions from both imported, and not yet imported
+  /// libraries. Items from not yet imported libraries will have `isNotImported`
+  /// set to `true`.
+  final List<CompletionSuggestion> suggestions;
+
+  /// True if the number of suggestions after filtering was greater than the
+  /// requested `maxResults`.
+  final bool isIncomplete;
+
+  Suggestions2Result(this.replacementOffset, this.replacementLength,
+      this.suggestions, this.isIncomplete);
+}
+
 class SuggestionDetailsResult {
   static SuggestionDetailsResult parse(Map m) =>
       new SuggestionDetailsResult(m['completion'],
@@ -1292,15 +1365,21 @@ class SuggestionDetailsResult {
   SuggestionDetailsResult(this.completion, {this.change});
 }
 
-class ListTokenDetailsResult {
-  static ListTokenDetailsResult parse(Map m) => new ListTokenDetailsResult(
-      new List.from(m['tokens'].map((obj) => TokenDetails.parse(obj))));
+class SuggestionDetails2Result {
+  static SuggestionDetails2Result parse(Map m) => new SuggestionDetails2Result(
+      m['completion'], SourceChange.parse(m['change']));
 
-  /// A list of the file's scanned tokens including analysis information about
-  /// them.
-  final List<TokenDetails> tokens;
+  /// The full text to insert, which possibly includes now an import prefix. The
+  /// client should insert this text, not the `completion` from the selected
+  /// `CompletionSuggestion`.
+  final String completion;
 
-  ListTokenDetailsResult(this.tokens);
+  /// A change for the client to apply to make the accepted completion
+  /// suggestion available. In most cases the change is to add a new import
+  /// directive to the file.
+  final SourceChange change;
+
+  SuggestionDetails2Result(this.completion, this.change);
 }
 
 // search domain
@@ -1550,50 +1629,16 @@ class EditDomain extends Domain {
         .then(AvailableRefactoringsResult.parse);
   }
 
-  /// Request information about edit.dartfix such as the list of known fixes
-  /// that can be specified in an edit.dartfix request.
-  @experimental
-  Future<DartfixInfoResult> getDartfixInfo() =>
-      _call('edit.getDartfixInfo').then(DartfixInfoResult.parse);
-
   /// Analyze the specified sources for fixes that can be applied in bulk and
   /// return a set of suggested edits for those sources. These edits may include
   /// changes to sources outside the set of specified sources if a change in a
   /// specified source requires it.
   @experimental
-  Future<BulkFixesResult> bulkFixes(List<String>? included) {
+  Future<BulkFixesResult> bulkFixes(List<String>? included,
+      {bool? inTestMode}) {
     final Map m = {'included': included};
+    if (inTestMode != null) m['inTestMode'] = inTestMode;
     return _call('edit.bulkFixes', m).then(BulkFixesResult.parse);
-  }
-
-  /// Analyze the specified sources for recommended changes and return a set of
-  /// suggested edits for those sources. These edits may include changes to
-  /// sources outside the set of specified sources if a change in a specified
-  /// source requires it.
-  ///
-  /// If includedFixes is specified, then those fixes will be applied. If
-  /// includePedanticFixes is specified, then fixes associated with the pedantic
-  /// rule set will be applied in addition to whatever fixes are specified in
-  /// includedFixes if any. If neither includedFixes nor includePedanticFixes is
-  /// specified, then no fixes will be applied. If excludedFixes is specified,
-  /// then those fixes will not be applied regardless of whether they are
-  /// specified in includedFixes.
-  @experimental
-  Future<DartfixResult> dartfix(List<String>? included,
-      {List<String>? includedFixes,
-      bool? includePedanticFixes,
-      List<String>? excludedFixes,
-      int? port,
-      String? outputDir}) {
-    final Map m = {'included': included};
-    if (includedFixes != null) m['includedFixes'] = includedFixes;
-    if (includePedanticFixes != null) {
-      m['includePedanticFixes'] = includePedanticFixes;
-    }
-    if (excludedFixes != null) m['excludedFixes'] = excludedFixes;
-    if (port != null) m['port'] = port;
-    if (outputDir != null) m['outputDir'] = outputDir;
-    return _call('edit.dartfix', m).then(DartfixResult.parse);
   }
 
   /// Return the set of fixes that are available for the errors at a given
@@ -1755,16 +1800,6 @@ class AvailableRefactoringsResult {
   AvailableRefactoringsResult(this.kinds);
 }
 
-class DartfixInfoResult {
-  static DartfixInfoResult parse(Map m) => new DartfixInfoResult(
-      new List.from(m['fixes'].map((obj) => DartFix.parse(obj))));
-
-  /// A list of fixes that can be specified in an edit.dartfix request.
-  final List<DartFix> fixes;
-
-  DartfixInfoResult(this.fixes);
-}
-
 class BulkFixesResult {
   static BulkFixesResult parse(Map m) => new BulkFixesResult(
       new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
@@ -1777,53 +1812,6 @@ class BulkFixesResult {
   final List<BulkFix> details;
 
   BulkFixesResult(this.edits, this.details);
-}
-
-class DartfixResult {
-  static DartfixResult parse(Map m) => new DartfixResult(
-      new List.from(
-          m['suggestions'].map((obj) => DartFixSuggestion.parse(obj))),
-      new List.from(
-          m['otherSuggestions'].map((obj) => DartFixSuggestion.parse(obj))),
-      m['hasErrors'],
-      new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
-      details: m['details'] == null ? null : new List.from(m['details']),
-      port: m['port'],
-      urls: m['urls'] == null ? null : new List.from(m['urls']));
-
-  /// A list of recommended changes that can be automatically made by applying
-  /// the 'edits' included in this response.
-  final List<DartFixSuggestion> suggestions;
-
-  /// A list of recommended changes that could not be automatically made.
-  final List<DartFixSuggestion> otherSuggestions;
-
-  /// True if the analyzed source contains errors that might impact the
-  /// correctness of the recommended changes that can be automatically applied.
-  final bool hasErrors;
-
-  /// A list of source edits to apply the recommended changes.
-  final List<SourceFileEdit> edits;
-
-  /// Messages that should be displayed to the user that describe details of the
-  /// fix generation. For example, the messages might (a) point out details that
-  /// users might want to explore before committing the changes or (b) describe
-  /// exceptions that were thrown but that did not stop the fixes from being
-  /// produced. The list will be omitted if it is empty.
-  final List<String>? details;
-
-  /// The port on which the preview tool will respond to GET requests. The field
-  /// is omitted if a preview was not requested.
-  final int? port;
-
-  /// The URLs that users can visit in a browser to see a preview of the
-  /// proposed changes. There is one URL for each of the included file paths.
-  /// The field is omitted if a preview was not requested.
-  final List<String>? urls;
-
-  DartfixResult(
-      this.suggestions, this.otherSuggestions, this.hasErrors, this.edits,
-      {this.details, this.port, this.urls});
 }
 
 class FixesResult {
@@ -3006,39 +2994,6 @@ class ContextData {
 
   ContextData(this.name, this.explicitFileCount, this.implicitFileCount,
       this.workItemQueueLength, this.cacheEntryExceptions);
-}
-
-/// A "fix" that can be specified in an edit.dartfix request.
-@experimental
-class DartFix {
-  static DartFix parse(Map m) {
-    return new DartFix(m['name'], description: m['description']);
-  }
-
-  /// The name of the fix.
-  final String name;
-
-  /// A human readable description of the fix.
-  final String? description;
-
-  DartFix(this.name, {this.description});
-}
-
-/// A suggestion from an edit.dartfix request.
-@experimental
-class DartFixSuggestion {
-  static DartFixSuggestion parse(Map m) {
-    return new DartFixSuggestion(m['description'],
-        location: m['location'] == null ? null : Location.parse(m['location']));
-  }
-
-  /// A human readable description of the suggested change.
-  final String description;
-
-  /// The location of the suggested change.
-  final Location? location;
-
-  DartFixSuggestion(this.description, {this.location});
 }
 
 /// A message associated with a diagnostic.
@@ -4522,37 +4477,6 @@ class SourceFileEdit {
   SourceFileEdit(this.file, this.fileStamp, this.edits);
 
   String toString() => '[SourceFileEdit file: ${file}, edits: ${edits}]';
-}
-
-/// A scanned token along with its inferred type information.
-@experimental
-class TokenDetails {
-  static TokenDetails parse(Map m) {
-    return new TokenDetails(m['lexeme'], m['offset'],
-        type: m['type'],
-        validElementKinds: m['validElementKinds'] == null
-            ? null
-            : new List.from(m['validElementKinds']));
-  }
-
-  /// The token's lexeme.
-  final String lexeme;
-
-  /// The offset of the first character of the token in the file which it
-  /// originated from.
-  final int offset;
-
-  /// A unique id for the type of the identifier. Omitted if the token is not an
-  /// identifier in a reference position.
-  final String? type;
-
-  /// An indication of whether this token is in a declaration or reference
-  /// position. (If no other purpose is found for this field then it should be
-  /// renamed and converted to a boolean value.) Omitted if the token is not an
-  /// identifier.
-  final List<String>? validElementKinds;
-
-  TokenDetails(this.lexeme, this.offset, {this.type, this.validElementKinds});
 }
 
 /// A representation of a class in a type hierarchy.
