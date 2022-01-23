@@ -9,8 +9,6 @@ import '../src/helper.dart';
 
 void main() => defineTests();
 
-// todo: test completion.getSuggestions2
-
 void defineTests() {
   group('completion', () {
     late ServerHelper helper;
