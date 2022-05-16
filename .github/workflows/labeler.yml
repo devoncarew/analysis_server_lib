@@ -1,0 +1,19 @@
+# Workflow action documentation at https://github.com/andymckay/labeler.
+name: Issue triage
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  automate-issues-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: triage labeling
+        uses: andymckay/labeler@1.0.4
+        with:
+          add-labels: "needs-triage"
+          ignore-if-assigned: true
+          ignore-if-labeled: true
