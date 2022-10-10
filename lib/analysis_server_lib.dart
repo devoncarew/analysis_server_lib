@@ -73,6 +73,10 @@ class AnalysisServer {
       vmPath = Platform.resolvedExecutable;
     }
     scriptPath ??= '$sdkPath/bin/snapshots/analysis_server.dart.snapshot';
+    if (!await File(scriptPath).exists()) {
+      throw "The analysis_server snapshot doesn't exist at '$scriptPath', "
+          "consider passing `sdkPath` to `AnalysisServer.create`.";
+    }
 
     List<String> args = [scriptPath, '--sdk', sdkPath];
     if (vmArgs != null) args.insertAll(0, vmArgs);
@@ -82,9 +86,7 @@ class AnalysisServer {
 
     Process process =
         await Process.start(vmPath, args, environment: processEnvironment);
-    // ignore: unused_local_variable
-    Future unawaited =
-        process.exitCode.then((code) => processCompleter.complete(code));
+    unawaited(process.exitCode.then((code) => processCompleter.complete(code)));
 
     Stream<String> inStream = process.stdout
         .transform(utf8.decoder)
