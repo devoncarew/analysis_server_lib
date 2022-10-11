@@ -73,7 +73,7 @@ class AnalysisServer {
       vmPath = Platform.resolvedExecutable;
     }
     scriptPath ??= '$sdkPath/bin/snapshots/analysis_server.dart.snapshot';
-    if (!await File(scriptPath).exists()) {
+    if (!File(scriptPath).existsSync()) {
       throw "The analysis_server snapshot doesn't exist at '$scriptPath', "
           "consider passing `sdkPath` to `AnalysisServer.create`.";
     }
