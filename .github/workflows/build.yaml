@@ -13,10 +13,10 @@ jobs:
         sdk: ['stable']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: dart-lang/setup-dart@v1.0
+      - uses: dart-lang/setup-dart@v1.3
         with:
           sdk: ${{ matrix.sdk }}
-      - uses: actions/checkout@v3.0
+      - uses: actions/checkout@v3.1.0
       - run: dart --version
       - run: dart pub get
       # Verify the library re-generates.
