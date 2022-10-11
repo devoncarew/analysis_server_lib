@@ -1,3 +1,7 @@
+# 0.2.3
+
+- Add a sanity check for the availability of the Dart SDK
+
 # 0.2.2
 
 - Upgraded to the latest version (`1.32.8`) of the analysis server spec
