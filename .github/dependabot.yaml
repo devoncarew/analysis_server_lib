@@ -3,6 +3,10 @@ version: 2
 
 updates:
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directory: ".github/"
     schedule:
       interval: "monthly"
+    ignore:
+      - dependency-name: *
+        update-types:
+          - "version-update:semver-patch"
