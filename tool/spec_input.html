@@ -7,7 +7,7 @@
 <body>
 <h1>Analysis Server API Specification</h1>
 <h1 style="color:#999999">Version
-  <version>1.32.8</version>
+  <version>1.33.4</version>
 </h1>
 <p>
   This document contains a specification of the API provided by the
@@ -67,12 +67,12 @@
 </p>
 <p>
   Every request is required to have two fields and may have two
-  additional optional fields. The first required field is the ‘id’
+  additional optional fields. The first required field is the 'id'
   field, which is only used by the server to associate a response
   with the request that generated the response. The second
-  required field is the ‘method’ field, which is used to determine
+  required field is the 'method' field, which is used to determine
   what the server is being requested to do. One optional field is
-  the ‘params’ field, whose structure is dependent on the method
+  the 'params' field, whose structure is dependent on the method
   being requested. The structure of this field is described with
   each request for which it is required. The other optional field
   is the 'clientRequestTime' field, which is a number indicating
@@ -83,11 +83,11 @@
 </p>
 <p>
   Every response has up to three fields. The first field is the
-  ‘id’ field, which is always present and whose value is the
+  'id' field, which is always present and whose value is the
   identifier that was passed to the request that generated the
-  response. The second field is the ‘error’ field, which is only
+  response. The second field is the 'error' field, which is only
   present if an error was encountered while processing the
-  request. The third field is the ‘result’ field, whose structure
+  request. The third field is the 'result' field, whose structure
   is dependent on the method being responded to, and is described
   with each request that will produce it.
 </p>
@@ -106,9 +106,9 @@
   errors can be returned together at a later time.
 </p>
 <p>
-  Each notification has two fields. The first field is the ‘event’
+  Each notification has two fields. The first field is the 'event'
   field, which identifies the kind of notification. The second
-  field is the ‘params’ field, whose structure is dependent on the
+  field is the 'params' field, whose structure is dependent on the
   kind of notification being sent. The structure of this field is
   described with each notification.
 </p>
@@ -134,6 +134,20 @@
   ignoring the item or treating it with some default/fallback handling.
 </p>
 <h3>Changelog</h3>
+<h4>1.33.1</h4>
+<ul>
+  <li><tt>SourceChange</tt> now has an optional <tt>selectionLength</tt> that may be
+  provided when <tt>selection</tt> is.</li>
+</ul>
+<h4>1.33.0</h4>
+<ul>
+  <li>Requests <tt>getSuggestions2</tt> and <tt>getSuggestionDetails2</tt>
+    are enabled.</li>
+</ul>
+<h4>1.32.10</h4>
+<ul>
+  <li>The <tt>MOVE_FILE</tt> refactor now supports moving/renaming folders.</li>
+</ul>
 <h4>1.32.8</h4>
 <ul>
   <li>Added <tt>server.cancelRequest</tt> to allow clients to request cancellation
@@ -181,7 +195,7 @@
 <h3>Domains</h3>
 <p>
   For convenience, the API is divided into domains. Each domain is specified
-  in a separate section below. The specifications of the API’s refer to data
+  in a separate section below. The specifications of the API's refer to data
   structures beyond the standard JSON primitives. These data structures are
   documented in the section titled <a href="#types">Types</a>.
 </p>
@@ -258,7 +272,7 @@
 <domains></domains>
 <domain name="server">
   <p>
-    The server domain contains API’s related to the execution of
+    The server domain contains API's related to the execution of
     the server.
   </p>
   <request method="getVersion">
@@ -427,7 +441,7 @@
 </domain>
 <domain name="analysis">
   <p>
-    The analysis domain contains API’s related to the analysis of
+    The analysis domain contains API's related to the analysis of
     files.
   </p>
   <request method="getErrors">
@@ -829,7 +843,7 @@
       file. If none is found, then the parents of the directory
       will be searched until such a file is found or the root of
       the file system is reached. If such a file is found, it will
-      be used to resolve package: URI’s within the file.
+      be used to resolve package: URI's within the file.
     </p>
     <params>
       <field name="included">
@@ -866,7 +880,8 @@
         </p>
         <p>
           If a package root is a file, then the analyzer
-          will behave as though that file is a ".packages" file in the
+          will behave as though that file is a
+          ".dart_tool/package_config.json" file in the
           source directory. The effect is the same as specifying the file
           as a "--packages" parameter to the Dart VM when
           executing any Dart file inside the source directory.
@@ -1480,7 +1495,7 @@
       </field>
     </result>
   </request>
-  <request method="getSuggestions2" experimental="true">
+  <request method="getSuggestions2">
     <p>
       Request that completion suggestions for the given offset in the given
       file be returned. The suggestions will be filtered using fuzzy matching
@@ -1505,6 +1520,13 @@
           The maximum number of suggestions to return. If the number of
           suggestions after filtering is greater than the <tt>maxResults</tt>,
           then <tt>isIncomplete</tt> is set to <tt>true</tt>.
+        </p>
+      </field>
+      <field name="completionCaseMatchingMode" optional="true">
+        <ref>CompletionCaseMatchingMode</ref>
+        <p>
+          The mode of code completion being invoked. If no value is provided,
+          <tt>MATCH_FIRST_CHAR</tt> will be assumed.
         </p>
       </field>
       <field name="completionMode" experimental="true" optional="true">
@@ -1618,7 +1640,7 @@
         <p>
           A list of objects each containing a path and the additional libraries from which
           the client is interested in receiving completion suggestions.
-          If one configured path is beneath another, the descendent
+          If one configured path is beneath another, the descendant
           will override the ancestors' configured libraries of interest.
         </p>
       </field>
@@ -1678,7 +1700,7 @@
       </field>
     </result>
   </request>
-  <request method="getSuggestionDetails2" experimental="true">
+  <request method="getSuggestionDetails2">
     <p>
       Clients must make this request when the user has selected a completion
       suggestion with the <tt>isNotImported</tt> field set to <tt>true</tt>.
@@ -2260,6 +2282,41 @@
       </field>
     </result>
   </request>
+  <request method="formatIfEnabled" experimental="true">
+    <p>
+      Format the contents of the files in one or more directories, but only if
+      the analysis options file for those files has enabled the 'format' option.
+    </p>
+    <p>
+      If any of the specified directories does not exist, that directory will be
+      ignored. If any of the files that are eligible for being formatted cannot
+      be formatted because of a syntax error in the file, that file will be
+      ignored.
+    </p>
+    <params>
+      <field name="directories">
+        <list>
+          <ref>FilePath</ref>
+        </list>
+        <p>
+          The paths of the directories containing the code to be formatted.
+        </p>
+      </field>
+    </params>
+    <result>
+      <field name="edits">
+        <list>
+          <ref>SourceFileEdit</ref>
+        </list>
+        <p>
+          The edit(s) to be applied in order to format the code. The list will
+          be empty if none of the files were formatted, whether because they
+          were not eligible to be formatted or because they were already
+          formatted.
+        </p>
+      </field>
+    </result>
+  </request>
   <request method="getAssists">
     <p>
       Return the set of assists that are available at the given
@@ -2379,8 +2436,22 @@
           If this field is omitted the flag defaults to <tt>false</tt>.
         </p>
       </field>
+      <field name="codes" optional="true">
+        <list>
+          <ref>String</ref>
+        </list>
+        <p>
+          A list of diagnostic codes to be fixed.
+        </p>
+      </field>
     </params>
     <result>
+      <field name="message">
+        <p>
+          An optional message explaining unapplied fixes.
+        </p>
+        <ref>String</ref>
+      </field>
       <field name="edits">
         <list>
           <ref>SourceFileEdit</ref>
@@ -3233,57 +3304,9 @@
     </params>
   </request>
 </domain>
-<domain name="kythe" experimental="true">
-  <p>
-    The kythe domain contains APIs related to generating Dart content in the
-    <a href="http://kythe.io/">Kythe</a> format.
-  </p>
-  <request method="getKytheEntries">
-    <p>
-      Return the list of <tt>KytheEntry</tt> objects for some file, given the
-      current state of the file system populated by "analysis.updateContent".
-    </p>
-    <p>
-      If a request is made for a file that does not exist, or that is not
-      currently subject to analysis (e.g. because it is not associated with any
-      analysis root specified to analysis.setAnalysisRoots), an error of type
-      <tt>GET_KYTHE_ENTRIES_INVALID_FILE</tt> will be generated.
-    </p>
-    <params>
-      <field name="file">
-        <ref>FilePath</ref>
-        <p>
-          The file containing the code for which the Kythe Entry objects are
-          being requested.
-        </p>
-      </field>
-    </params>
-    <result>
-      <field name="entries">
-        <list>
-          <ref>KytheEntry</ref>
-        </list>
-        <p>
-          The list of <tt>KytheEntry</tt> objects for the queried file.
-        </p>
-      </field>
-      <field name="files">
-        <list>
-          <ref>FilePath</ref>
-        </list>
-        <p>
-          The set of files paths that were required, but not in the file system,
-          to give a complete and accurate Kythe graph for the file. This could
-          be due to a referenced file that does not exist or generated files not
-          being generated or passed before the call to "getKytheEntries".
-        </p>
-      </field>
-    </result>
-  </request>
-</domain>
 <domain name="flutter">
   <p>
-    The analysis domain contains API’s related to Flutter support.
+    The analysis domain contains API's related to Flutter support.
   </p>
   <request method="getWidgetDescription" experimental="true">
     <p>
@@ -3460,7 +3483,7 @@
   <h2 class="domain"><a name="types">Types</a></h2>
   <p>
     This section contains descriptions of the data types referenced
-    in the API’s of the various domains.
+    in the API's of the various domains.
   </p>
   <include path="../../../analyzer_plugin/tool/spec/common_types_spec.html"
            import="package:analyzer_plugin/protocol/protocol_common.dart"></include>
@@ -4142,6 +4165,32 @@
         <code>SMART</code>
         <p>
           Smart code completion, currently not implemented.
+        </p>
+      </value>
+    </enum>
+  </type>
+  <type name="CompletionCaseMatchingMode">
+    <p>
+      An enumeration of the character case matching modes that the user may set in the client.
+    </p>
+    <enum>
+      <value>
+        <code>FIRST_CHAR</code>
+        <p>
+          Match the first character case only when filtering completions, the default for this
+          enumeration.
+        </p>
+      </value>
+      <value>
+        <code>ALL_CHARS</code>
+        <p>
+          Match all character cases when filtering completion lists.
+        </p>
+      </value>
+      <value>
+        <code>NONE</code>
+        <p>
+          Do not match character cases when filtering completion lists.
         </p>
       </value>
     </enum>
@@ -5109,13 +5158,6 @@
         </p>
       </value>
       <value>
-        <code>GET_KYTHE_ENTRIES_INVALID_FILE</code>
-        <p>
-          An "analysis.getKytheEntries" request specified a FilePath that does
-          not match a file that is currently subject to analysis.
-        </p>
-      </value>
-      <value>
         <code>GET_NAVIGATION_INVALID_FILE</code>
         <p>
           An "analysis.getNavigation" request specified a FilePath
@@ -5874,10 +5916,15 @@
   </refactoring>
   <refactoring kind="MOVE_FILE">
     <p>
-      Move the given file and update all of the references to that file
-      and from it. The move operation is supported in general case - for
-      renaming a file in the same folder, moving it to a different folder
-      or both.
+      Move the given file or folder and update all of the references to
+      and from it. The move operation is supported in general case -
+      for renaming an item in the same folder, moving it to a different
+      folder or both.
+
+      Moving or renaming large folders may take time and clients should
+      consider showing an indicator to the user with the ability to
+      cancel the request (which can be done using
+      <tt>server.cancelRequest</tt>).
     </p>
     <p>
       The refactoring must be activated before an actual file moving

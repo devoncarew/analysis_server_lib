@@ -588,7 +588,7 @@ class Field implements Comparable {
     docs = _collectDocs(element);
     optional = element.attributes['optional'] == 'true';
     deprecated = element.attributes.containsKey('deprecated');
-    type = Type.create(element.children.first);
+    type = Type.create(element.children.firstWhere((e) => e.localName != 'p'));
   }
 
   void setCallParam() => type.setCallParam();
