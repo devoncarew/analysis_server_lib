@@ -23,7 +23,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.32.8';
+const String generatedProtocolVersion = '1.33.4';
 
 typedef MethodSend = void Function(String methodName);
 
@@ -126,7 +126,6 @@ class AnalysisServer {
   late final ExecutionDomain _execution = ExecutionDomain(this);
   late final DiagnosticDomain _diagnostic = DiagnosticDomain(this);
   late final AnalyticsDomain _analytics = AnalyticsDomain(this);
-  late final KytheDomain _kythe = KytheDomain(this);
   late final FlutterDomain _flutter = FlutterDomain(this);
 
   /// Connect to an existing analysis server instance.
@@ -144,7 +143,6 @@ class AnalysisServer {
   ExecutionDomain get execution => _execution;
   DiagnosticDomain get diagnostic => _diagnostic;
   AnalyticsDomain get analytics => _analytics;
-  KytheDomain get kythe => _kythe;
   FlutterDomain get flutter => _flutter;
 
   Stream<String> get onSend => _onSend.stream;
@@ -302,7 +300,7 @@ Map _stripNullValues(Map m) {
 
 // server domain
 
-/// The server domain contains API’s related to the execution of the server.
+/// The server domain contains API's related to the execution of the server.
 class ServerDomain extends Domain {
   ServerDomain(AnalysisServer server) : super(server, 'server');
 
@@ -437,7 +435,7 @@ class VersionResult {
 
 // analysis domain
 
-/// The analysis domain contains API’s related to the analysis of files.
+/// The analysis domain contains API's related to the analysis of files.
 class AnalysisDomain extends Domain {
   AnalysisDomain(AnalysisServer server) : super(server, 'analysis');
 
@@ -695,7 +693,7 @@ class AnalysisDomain extends Domain {
   /// directory containing the file for a pubspec.yaml file. If none is found,
   /// then the parents of the directory will be searched until such a file is
   /// found or the root of the file system is reached. If such a file is found,
-  /// it will be used to resolve package: URI’s within the file.
+  /// it will be used to resolve package: URI's within the file.
   Future setAnalysisRoots(List<String>? included, List<String>? excluded,
       {Map<String, String>? packageRoots}) {
     final Map m = {'included': included, 'excluded': excluded};
@@ -1127,11 +1125,16 @@ class CompletionDomain extends Domain {
   /// Request that completion suggestions for the given offset in the given file
   /// be returned. The suggestions will be filtered using fuzzy matching with
   /// the already existing prefix.
-  @experimental
   Future<Suggestions2Result> getSuggestions2(
       String? file, int? offset, int? maxResults,
-      {String? completionMode, int? invocationCount, int? timeout}) {
+      {String? completionCaseMatchingMode,
+      String? completionMode,
+      int? invocationCount,
+      int? timeout}) {
     final Map m = {'file': file, 'offset': offset, 'maxResults': maxResults};
+    if (completionCaseMatchingMode != null) {
+      m['completionCaseMatchingMode'] = completionCaseMatchingMode;
+    }
     if (completionMode != null) m['completionMode'] = completionMode;
     if (invocationCount != null) m['invocationCount'] = invocationCount;
     if (timeout != null) m['timeout'] = timeout;
@@ -1172,7 +1175,6 @@ class CompletionDomain extends Domain {
   /// added. The text to insert might be different from the original suggestion
   /// to include an import prefix if the library will be imported with a prefix
   /// to avoid shadowing conflicts in the file.
-  @experimental
   Future<SuggestionDetails2Result> getSuggestionDetails2(
       String? file, int? offset, String? completion, String? libraryUri) {
     final Map m = {
@@ -1613,6 +1615,19 @@ class EditDomain extends Domain {
     return _call('edit.format', m).then(FormatResult.parse);
   }
 
+  /// Format the contents of the files in one or more directories, but only if
+  /// the analysis options file for those files has enabled the 'format' option.
+  ///
+  /// If any of the specified directories does not exist, that directory will be
+  /// ignored. If any of the files that are eligible for being formatted cannot
+  /// be formatted because of a syntax error in the file, that file will be
+  /// ignored.
+  @experimental
+  Future<FormatIfEnabledResult> formatIfEnabled(List<String>? directories) {
+    final Map m = {'directories': directories};
+    return _call('edit.formatIfEnabled', m).then(FormatIfEnabledResult.parse);
+  }
+
   /// Return the set of assists that are available at the given location. An
   /// assist is distinguished from a refactoring primarily by the fact that it
   /// affects a single file and does not require user input in order to be
@@ -1637,9 +1652,10 @@ class EditDomain extends Domain {
   /// specified source requires it.
   @experimental
   Future<BulkFixesResult> bulkFixes(List<String>? included,
-      {bool? inTestMode}) {
+      {bool? inTestMode, List<String>? codes}) {
     final Map m = {'included': included};
     if (inTestMode != null) m['inTestMode'] = inTestMode;
+    if (codes != null) m['codes'] = codes;
     return _call('edit.bulkFixes', m).then(BulkFixesResult.parse);
   }
 
@@ -1782,6 +1798,18 @@ class FormatResult {
   FormatResult(this.edits, this.selectionOffset, this.selectionLength);
 }
 
+class FormatIfEnabledResult {
+  static FormatIfEnabledResult parse(Map m) => new FormatIfEnabledResult(
+      new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))));
+
+  /// The edit(s) to be applied in order to format the code. The list will be
+  /// empty if none of the files were formatted, whether because they were not
+  /// eligible to be formatted or because they were already formatted.
+  final List<SourceFileEdit> edits;
+
+  FormatIfEnabledResult(this.edits);
+}
+
 class AssistsResult {
   static AssistsResult parse(Map m) => new AssistsResult(
       new List.from(m['assists'].map((obj) => SourceChange.parse(obj))));
@@ -1804,8 +1832,12 @@ class AvailableRefactoringsResult {
 
 class BulkFixesResult {
   static BulkFixesResult parse(Map m) => new BulkFixesResult(
+      m['message'],
       new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
       new List.from(m['details'].map((obj) => BulkFix.parse(obj))));
+
+  /// An optional message explaining unapplied fixes.
+  final String message;
 
   /// A list of source edits to apply the recommended changes.
   final List<SourceFileEdit> edits;
@@ -1813,7 +1845,7 @@ class BulkFixesResult {
   /// Details that summarize the fixes associated with the recommended changes.
   final List<BulkFix> details;
 
-  BulkFixesResult(this.edits, this.details);
+  BulkFixesResult(this.message, this.edits, this.details);
 }
 
 class FixesResult {
@@ -2259,47 +2291,9 @@ class IsEnabledResult {
   IsEnabledResult(this.enabled);
 }
 
-// kythe domain
-
-/// The kythe domain contains APIs related to generating Dart content in the
-/// (Kythe)[http://kythe.io/] format.
-@experimental
-class KytheDomain extends Domain {
-  KytheDomain(AnalysisServer server) : super(server, 'kythe');
-
-  /// Return the list of `KytheEntry` objects for some file, given the current
-  /// state of the file system populated by "analysis.updateContent".
-  ///
-  /// If a request is made for a file that does not exist, or that is not
-  /// currently subject to analysis (e.g. because it is not associated with any
-  /// analysis root specified to analysis.setAnalysisRoots), an error of type
-  /// `GET_KYTHE_ENTRIES_INVALID_FILE` will be generated.
-  Future<KytheEntriesResult> getKytheEntries(String? file) {
-    final Map m = {'file': file};
-    return _call('kythe.getKytheEntries', m).then(KytheEntriesResult.parse);
-  }
-}
-
-class KytheEntriesResult {
-  static KytheEntriesResult parse(Map m) => new KytheEntriesResult(
-      new List.from(m['entries'].map((obj) => KytheEntry.parse(obj))),
-      new List.from(m['files']));
-
-  /// The list of `KytheEntry` objects for the queried file.
-  final List<KytheEntry> entries;
-
-  /// The set of files paths that were required, but not in the file system, to
-  /// give a complete and accurate Kythe graph for the file. This could be due
-  /// to a referenced file that does not exist or generated files not being
-  /// generated or passed before the call to "getKytheEntries".
-  final List<String> files;
-
-  KytheEntriesResult(this.entries, this.files);
-}
-
 // flutter domain
 
-/// The analysis domain contains API’s related to Flutter support.
+/// The analysis domain contains API's related to Flutter support.
 class FlutterDomain extends Domain {
   FlutterDomain(AnalysisServer server) : super(server, 'flutter');
 
@@ -2804,6 +2798,8 @@ class CompletionSuggestion implements Jsonable {
         m['isDeprecated'],
         m['isPotential'],
         displayText: m['displayText'],
+        replacementOffset: m['replacementOffset'],
+        replacementLength: m['replacementLength'],
         docSummary: m['docSummary'],
         docComplete: m['docComplete'],
         declaringType: m['declaringType'],
@@ -2823,7 +2819,9 @@ class CompletionSuggestion implements Jsonable {
         requiredParameterCount: m['requiredParameterCount'],
         hasNamedParameters: m['hasNamedParameters'],
         parameterName: m['parameterName'],
-        parameterType: m['parameterType']);
+        parameterType: m['parameterType'],
+        libraryUri: m['libraryUri'],
+        isNotImported: m['isNotImported']);
   }
 
   /// The kind of element being suggested.
@@ -2857,6 +2855,19 @@ class CompletionSuggestion implements Jsonable {
   /// only defined if the displayed text should be different than the
   /// completion. Otherwise it is omitted.
   final String? displayText;
+
+  /// The offset of the start of the text to be replaced. If supplied, this
+  /// should be used in preference to the offset provided on the containing
+  /// completion results. This value may be provided independently of
+  /// replacementLength (for example if only one differs from the completion
+  /// result value).
+  final int? replacementOffset;
+
+  /// The length of the text to be replaced. If supplied, this should be used in
+  /// preference to the offset provided on the containing completion results.
+  /// This value may be provided independently of replacementOffset (for example
+  /// if only one differs from the completion result value).
+  final int? replacementLength;
 
   /// An abbreviated version of the Dartdoc associated with the element being
   /// suggested. This field is omitted if there is no Dartdoc associated with
@@ -2917,6 +2928,29 @@ class CompletionSuggestion implements Jsonable {
   /// if the parameterName field is omitted.
   final String? parameterType;
 
+  /// This field is omitted if `getSuggestions` was used rather than
+  /// `getSuggestions2`.
+  ///
+  /// This field is omitted if this suggestion corresponds to a locally declared
+  /// element.
+  ///
+  /// If this suggestion corresponds to an already imported element, then this
+  /// field is the URI of a library that provides this element, not the URI of
+  /// the library where the element is declared.
+  ///
+  /// If this suggestion corresponds to an element from a not yet imported
+  /// library, this field is the URI of a library that could be imported to make
+  /// this suggestion accessible in the file where completion was requested,
+  /// such as `package:foo/bar.dart` or
+  /// `file:///home/me/workspace/foo/test/bar_test.dart`.
+  final String? libraryUri;
+
+  /// True if the suggestion is for an element from a not yet imported library.
+  /// This field is omitted if the element is declared locally, or is from
+  /// library is already imported, so that the suggestion can be inserted as is,
+  /// or if `getSuggestions` was used rather than `getSuggestions2`.
+  final bool? isNotImported;
+
   CompletionSuggestion(
       this.kind,
       this.relevance,
@@ -2926,6 +2960,8 @@ class CompletionSuggestion implements Jsonable {
       this.isDeprecated,
       this.isPotential,
       {this.displayText,
+      this.replacementOffset,
+      this.replacementLength,
       this.docSummary,
       this.docComplete,
       this.declaringType,
@@ -2938,7 +2974,9 @@ class CompletionSuggestion implements Jsonable {
       this.requiredParameterCount,
       this.hasNamedParameters,
       this.parameterName,
-      this.parameterType});
+      this.parameterType,
+      this.libraryUri,
+      this.isNotImported});
 
   Map toMap() => _stripNullValues({
         'kind': kind,
@@ -2949,6 +2987,8 @@ class CompletionSuggestion implements Jsonable {
         'isDeprecated': isDeprecated,
         'isPotential': isPotential,
         'displayText': displayText,
+        'replacementOffset': replacementOffset,
+        'replacementLength': replacementLength,
         'docSummary': docSummary,
         'docComplete': docComplete,
         'declaringType': declaringType,
@@ -2961,7 +3001,9 @@ class CompletionSuggestion implements Jsonable {
         'requiredParameterCount': requiredParameterCount,
         'hasNamedParameters': hasNamedParameters,
         'parameterName': parameterName,
-        'parameterType': parameterType
+        'parameterType': parameterType,
+        'libraryUri': libraryUri,
+        'isNotImported': isNotImported
       });
 
   String toString() =>
@@ -3025,7 +3067,8 @@ class Element implements Jsonable {
         location: m['location'] == null ? null : Location.parse(m['location']),
         parameters: m['parameters'],
         returnType: m['returnType'],
-        typeParameters: m['typeParameters']);
+        typeParameters: m['typeParameters'],
+        aliasedType: m['aliasedType']);
   }
 
   /// The kind of the element.
@@ -3056,8 +3099,16 @@ class Element implements Jsonable {
   /// parameters, this field will not be defined.
   final String? typeParameters;
 
+  /// If the element is a type alias, this field is the aliased type. Otherwise
+  /// this field will not be defined.
+  final String? aliasedType;
+
   Element(this.kind, this.name, this.flags,
-      {this.location, this.parameters, this.returnType, this.typeParameters});
+      {this.location,
+      this.parameters,
+      this.returnType,
+      this.typeParameters,
+      this.aliasedType});
 
   Map toMap() => _stripNullValues({
         'kind': kind,
@@ -3066,7 +3117,8 @@ class Element implements Jsonable {
         'location': location?.toMap(),
         'parameters': parameters,
         'returnType': returnType,
-        'typeParameters': typeParameters
+        'typeParameters': typeParameters,
+        'aliasedType': aliasedType
       });
 
   String toString() =>
@@ -3714,67 +3766,6 @@ class IncludedSuggestionSet {
   IncludedSuggestionSet(this.id, this.relevance, {this.displayUri});
 }
 
-/// This object matches the format and documentation of the Entry object
-/// documented in the (Kythe Storage
-/// Model)[https://kythe.io/docs/kythe-storage.html#_entry].
-class KytheEntry {
-  static KytheEntry parse(Map m) {
-    return new KytheEntry(KytheVName.parse(m['source']), m['fact'],
-        kind: m['kind'],
-        target: m['target'] == null ? null : KytheVName.parse(m['target']),
-        value: m['value'] == null ? null : new List.from(m['value']));
-  }
-
-  /// The ticket of the source node.
-  final KytheVName source;
-
-  /// A fact label. The schema defines which fact labels are meaningful.
-  final String fact;
-
-  /// An edge label. The schema defines which labels are meaningful.
-  final String? kind;
-
-  /// The ticket of the target node.
-  final KytheVName? target;
-
-  /// The `String` value of the fact.
-  final List<int>? value;
-
-  KytheEntry(this.source, this.fact, {this.kind, this.target, this.value});
-}
-
-/// This object matches the format and documentation of the Vector-Name object
-/// documented in the (Kythe Storage
-/// Model)[https://kythe.io/docs/kythe-storage.html#_a_id_termvname_a_vector_name_strong_vname_strong].
-class KytheVName {
-  static KytheVName parse(Map m) {
-    return new KytheVName(
-        m['signature'], m['corpus'], m['root'], m['path'], m['language']);
-  }
-
-  /// An opaque signature generated by the analyzer.
-  final String signature;
-
-  /// The corpus of source code this `KytheVName` belongs to. Loosely, a corpus
-  /// is a collection of related files, such as the contents of a given source
-  /// repository.
-  final String corpus;
-
-  /// A corpus-specific root label, typically a directory path or project
-  /// identifier, denoting a distinct subset of the corpus. This may also be
-  /// used to designate virtual collections like generated files.
-  final String root;
-
-  /// A path-structured label describing the “location” of the named object
-  /// relative to the corpus and the root.
-  final String path;
-
-  /// The language this name belongs to.
-  final String language;
-
-  KytheVName(this.signature, this.corpus, this.root, this.path, this.language);
-}
-
 /// A list of associations between paths and the libraries that should be
 /// included for code completion when editing a file beneath that path.
 class LibraryPathSet implements Jsonable {
@@ -3803,6 +3794,12 @@ class LibraryPathSet implements Jsonable {
 /// positions of the variable name so that if the client wanted to let the user
 /// edit the variable name after the operation, all occurrences of the name
 /// could be edited simultaneously.
+///
+/// Edit groups may have a length of 0 and function as tabstops where there is
+/// no default text, for example, an edit that inserts an `if` statement might
+/// provide an empty group between parens where a condition should be typed. For
+/// this reason, it's also valid for a group to contain only a single position
+/// that is not linked to others.
 class LinkedEditGroup {
   static LinkedEditGroup parse(Map m) {
     return new LinkedEditGroup(
@@ -3812,7 +3809,8 @@ class LinkedEditGroup {
             m['suggestions'].map((obj) => LinkedEditSuggestion.parse(obj))));
   }
 
-  /// The positions of the regions that should be edited simultaneously.
+  /// The positions of the regions (after applying the relevant edits) that
+  /// should be edited simultaneously.
   final List<Position> positions;
 
   /// The length of the regions that should be edited simultaneously.
@@ -3848,7 +3846,8 @@ class LinkedEditSuggestion {
 class Location implements Jsonable {
   static Location parse(Map m) {
     return new Location(
-        m['file'], m['offset'], m['length'], m['startLine'], m['startColumn']);
+        m['file'], m['offset'], m['length'], m['startLine'], m['startColumn'],
+        endLine: m['endLine'], endColumn: m['endColumn']);
   }
 
   /// The file containing the range.
@@ -3868,15 +3867,26 @@ class Location implements Jsonable {
   /// range.
   final int startColumn;
 
+  /// The one-based index of the line containing the character immediately
+  /// following the range.
+  final int? endLine;
+
+  /// The one-based index of the column containing the character immediately
+  /// following the range.
+  final int? endColumn;
+
   Location(
-      this.file, this.offset, this.length, this.startLine, this.startColumn);
+      this.file, this.offset, this.length, this.startLine, this.startColumn,
+      {this.endLine, this.endColumn});
 
   Map toMap() => _stripNullValues({
         'file': file,
         'offset': offset,
         'length': length,
         'startLine': startLine,
-        'startColumn': startColumn
+        'startColumn': startColumn,
+        'endLine': endLine,
+        'endColumn': endColumn
       });
 
   bool operator ==(o) =>
@@ -3885,7 +3895,9 @@ class Location implements Jsonable {
       offset == o.offset &&
       length == o.length &&
       startLine == o.startLine &&
-      startColumn == o.startColumn;
+      startColumn == o.startColumn &&
+      endLine == o.endLine &&
+      endColumn == o.endColumn;
 
   int get hashCode =>
       file.hashCode ^
@@ -4389,6 +4401,7 @@ class SourceChange {
             m['linkedEditGroups'].map((obj) => LinkedEditGroup.parse(obj))),
         selection:
             m['selection'] == null ? null : Position.parse(m['selection']),
+        selectionLength: m['selectionLength'],
         id: m['id']);
   }
 
@@ -4405,12 +4418,16 @@ class SourceChange {
   /// The position that should be selected after the edits have been applied.
   final Position? selection;
 
+  /// The length of the selection (starting at Position) that should be selected
+  /// after the edits have been applied.
+  final int? selectionLength;
+
   /// The optional identifier of the change kind. The identifier remains stable
   /// even if the message changes, or is parameterized.
   final String? id;
 
   SourceChange(this.message, this.edits, this.linkedEditGroups,
-      {this.selection, this.id});
+      {this.selection, this.selectionLength, this.id});
 
   String toString() =>
       '[SourceChange message: ${message}, edits: ${edits}, linkedEditGroups: ${linkedEditGroups}]';
@@ -4643,9 +4660,12 @@ class InlineMethodRefactoringOptions extends RefactoringOptions {
       _stripNullValues({'deleteSource': deleteSource, 'inlineAll': inlineAll});
 }
 
-/// Move the given file and update all of the references to that file and from
-/// it. The move operation is supported in general case - for renaming a file in
-/// the same folder, moving it to a different folder or both.
+/// Move the given file or folder and update all of the references to and from
+/// it. The move operation is supported in general case - for renaming an item
+/// in the same folder, moving it to a different folder or both. Moving or
+/// renaming large folders may take time and clients should consider showing an
+/// indicator to the user with the ability to cancel the request (which can be
+/// done using `server.cancelRequest`).
 ///
 /// The refactoring must be activated before an actual file moving operation is
 /// performed.

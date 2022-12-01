@@ -6,7 +6,7 @@
 </head>
 <body>
 <h1>Common Types</h1>
-<version>1.4.0</version>
+<version>1.4.5</version>
 <p>
   This document contains a specification of the types that are common between
   the analysis server wire protocol and the analysis server plugin wire
@@ -221,6 +221,32 @@
           completion.  Otherwise it is omitted.
         </p>
       </field>
+      <field name="replacementOffset" optional="true">
+        <ref>int</ref>
+        <p>
+          The offset of the start of the text to be
+          replaced. If supplied, this should be used in
+          preference to the offset provided on the
+          containing completion results.
+
+          This value may be provided independently of
+          replacementLength (for example if only one
+          differs from the completion result value).
+        </p>
+      </field>
+      <field name="replacementLength" optional="true">
+        <ref>int</ref>
+        <p>
+          The length of the text to be replaced.
+          If supplied, this should be used in preference
+          to the offset provided on the
+          containing completion results.
+
+          This value may be provided independently of
+          replacementOffset (for example if only one
+          differs from the completion result value).
+        </p>
+      </field>
       <field name="selectionOffset">
         <ref>int</ref>
         <p>
@@ -354,6 +380,39 @@
           omitted if the parameterName field is omitted.
         </p>
       </field>
+      <field name="libraryUri" optional="true">
+        <ref>String</ref>
+        <p>
+          This field  is omitted if <tt>getSuggestions</tt> was used rather
+          than <tt>getSuggestions2</tt>.
+        </p>
+        <p>
+          This field  is omitted if this suggestion corresponds to a locally
+          declared element.
+        </p>
+        <p>
+          If this suggestion corresponds to an already imported element,
+          then this field is the URI of a library that provides this element,
+          not the URI of the library where the element is declared.
+        </p>
+        <p>
+          If this suggestion corresponds to an element from a not yet
+          imported library, this field is the URI of a library that could be
+          imported to make this suggestion  accessible in the file where
+          completion was requested, such as <tt>package:foo/bar.dart</tt> or
+          <tt>file:///home/me/workspace/foo/test/bar_test.dart</tt>.
+        </p>
+      </field>
+      <field name="isNotImported" optional="true">
+        <ref>bool</ref>
+        <p>
+          True if the suggestion is for an element from a not yet imported
+          library. This field is omitted if the element is declared locally,
+          or is from library is already imported, so that the suggestion can
+          be inserted as is, or if <tt>getSuggestions</tt> was used rather
+          than <tt>getSuggestions2</tt>.
+        </p>
+      </field>
     </object>
   </type>
   <type name="CompletionSuggestionKind">
@@ -479,10 +538,10 @@
             0x01 - set if the element is explicitly or implicitly abstract
           </li>
           <li>
-            0x02 - set if the element was declared to be ‘const’
+            0x02 - set if the element was declared to be 'const'
           </li>
           <li>
-            0x04 - set if the element was declared to be ‘final’
+            0x04 - set if the element was declared to be 'final'
           </li>
           <li>
             0x08 - set if the element is a static member of a class or is a
@@ -520,6 +579,13 @@
           type parameters, this field will not be defined.
         </p>
       </field>
+      <field name="aliasedType" optional="true">
+        <ref>String</ref>
+        <p>
+          If the element is a type alias, this field is the aliased type.
+          Otherwise this field will not be defined.
+        </p>
+      </field>
     </object>
   </type>
   <type name="ElementKind">
@@ -550,6 +616,7 @@
       <value><code>PREFIX</code></value>
       <value><code>SETTER</code></value>
       <value><code>TOP_LEVEL_VARIABLE</code></value>
+      <value><code>TYPE_ALIAS</code></value>
       <value><code>TYPE_PARAMETER</code></value>
       <value><code>UNIT_TEST_GROUP</code></value>
       <value><code>UNIT_TEST_TEST</code></value>
@@ -575,12 +642,14 @@
       <value><code>ANNOTATIONS</code></value>
       <value><code>BLOCK</code></value>
       <value><code>CLASS_BODY</code></value>
+      <value><code>COMMENT</code></value>
       <value><code>DIRECTIVES</code></value>
       <value><code>DOCUMENTATION_COMMENT</code></value>
       <value><code>FILE_HEADER</code></value>
       <value><code>FUNCTION_BODY</code></value>
       <value><code>INVOCATION</code></value>
       <value><code>LITERAL</code></value>
+      <value><code>PARAMETERS</code></value>
     </enum>
   </type>
   <type name="FoldingRegion">
@@ -646,6 +715,7 @@
       <value><code>COMMENT_DOCUMENTATION</code></value>
       <value><code>COMMENT_END_OF_LINE</code></value>
       <value><code>CONSTRUCTOR</code></value>
+      <value><code>CONSTRUCTOR_TEAR_OFF</code></value>
       <value><code>DIRECTIVE</code></value>
       <value>
         <code>DYNAMIC_TYPE</code>
@@ -665,6 +735,7 @@
       </value>
       <value><code>ENUM</code></value>
       <value><code>ENUM_CONSTANT</code></value>
+      <value><code>EXTENSION</code></value>
       <value>
         <code>FIELD</code>
         <p>Deprecated - no longer sent.</p>
@@ -707,6 +778,9 @@
         <code>INSTANCE_METHOD_REFERENCE</code>
       </value>
       <value>
+        <code>INSTANCE_METHOD_TEAR_OFF</code>
+      </value>
+      <value>
         <code>INSTANCE_SETTER_DECLARATION</code>
       </value>
       <value>
@@ -725,12 +799,16 @@
       <value><code>LITERAL_INTEGER</code></value>
       <value><code>LITERAL_LIST</code></value>
       <value><code>LITERAL_MAP</code></value>
+      <value><code>LITERAL_RECORD</code></value>
       <value><code>LITERAL_STRING</code></value>
       <value>
         <code>LOCAL_FUNCTION_DECLARATION</code>
       </value>
       <value>
         <code>LOCAL_FUNCTION_REFERENCE</code>
+      </value>
+      <value>
+        <code>LOCAL_FUNCTION_TEAR_OFF</code>
       </value>
       <value>
         <code>LOCAL_VARIABLE</code>
@@ -790,6 +868,9 @@
         <code>STATIC_METHOD_REFERENCE</code>
       </value>
       <value>
+        <code>STATIC_METHOD_TEAR_OFF</code>
+      </value>
+      <value>
         <code>STATIC_SETTER_DECLARATION</code>
       </value>
       <value>
@@ -800,6 +881,9 @@
       </value>
       <value>
         <code>TOP_LEVEL_FUNCTION_REFERENCE</code>
+      </value>
+      <value>
+        <code>TOP_LEVEL_FUNCTION_TEAR_OFF</code>
       </value>
       <value>
         <code>TOP_LEVEL_GETTER_DECLARATION</code>
@@ -816,6 +900,9 @@
       <value>
         <code>TOP_LEVEL_VARIABLE_DECLARATION</code>
       </value>
+      <value>
+        <code>TYPE_ALIAS</code>
+      </value>
       <value><code>TYPE_NAME_DYNAMIC</code></value>
       <value><code>TYPE_PARAMETER</code></value>
       <value>
@@ -826,93 +913,6 @@
       </value>
     </enum>
   </type>
-  <type name="KytheEntry">
-    <p>
-      This object matches the format and documentation of the Entry object
-      documented in the
-      <a href="https://kythe.io/docs/kythe-storage.html#_entry">Kythe Storage
-        Model</a>.
-    </p>
-    <object>
-      <field name="source">
-        <ref>KytheVName</ref>
-        <p>
-          The ticket of the source node.
-        </p>
-      </field>
-      <field name="kind" optional="true">
-        <ref>String</ref>
-        <p>
-          An edge label. The schema defines which labels are meaningful.
-        </p>
-      </field>
-      <field name="target" optional="true">
-        <ref>KytheVName</ref>
-        <p>
-          The ticket of the target node.
-        </p>
-      </field>
-      <field name="fact">
-        <ref>String</ref>
-        <p>
-          A fact label. The schema defines which fact labels are meaningful.
-        </p>
-      </field>
-      <field name="value" optional="true">
-        <list>
-          <ref>int</ref>
-        </list>
-        <p>
-          The <tt>String</tt> value of the fact.
-        </p>
-      </field>
-    </object>
-  </type>
-  <type name="KytheVName">
-    <p>
-      This object matches the format and documentation of the Vector-Name object
-      documented in the
-      <a href="https://kythe.io/docs/kythe-storage.html#_a_id_termvname_a_vector_name_strong_vname_strong">Kythe
-        Storage Model</a>.
-    </p>
-    <object>
-      <field name="signature">
-        <ref>String</ref>
-        <p>
-          An opaque signature generated by the analyzer.
-        </p>
-      </field>
-      <field name="corpus">
-        <ref>String</ref>
-        <p>
-          The corpus of source code this <tt>KytheVName</tt> belongs to.
-          Loosely, a corpus is a collection of related files, such as the
-          contents of a given source repository.
-        </p>
-      </field>
-      <field name="root">
-        <ref>String</ref>
-        <p>
-          A corpus-specific root label, typically a directory path or project
-          identifier, denoting a distinct subset of the corpus. This may also be
-          used to designate virtual collections like generated files.
-        </p>
-      </field>
-      <field name="path">
-        <ref>String</ref>
-        <p>
-          A path-structured label describing the “location” of the named object
-          relative to the corpus and the root.
-        </p>
-      </field>
-      <field name="language">
-        <ref>String</ref>
-        <p>
-          The language this name belongs to.
-        </p>
-      </field>
-    </object>
-  </type>
   <type name="LinkedEditGroup">
     <p>
       A collection of positions that should be linked (edited simultaneously)
@@ -922,13 +922,21 @@
       the user edit the variable name after the operation, all occurrences of
       the name could be edited simultaneously.
     </p>
+    <p>
+      Edit groups may have a length of 0 and function as tabstops where there
+      is no default text, for example, an edit that inserts an <tt>if</tt>
+      statement might provide an empty group between parens where a condition
+      should be typed. For this reason, it's also valid for a group to contain
+      only a single position that is not linked to others.
+    </p>
     <object>
       <field name="positions">
         <list>
           <ref>Position</ref>
         </list>
         <p>
-          The positions of the regions that should be edited simultaneously.
+          The positions of the regions (after applying the relevant edits) that
+          should be edited simultaneously.
         </p>
       </field>
       <field name="length">
@@ -1016,6 +1024,20 @@
         <p>
           The one-based index of the column containing the first character of
           the range.
+        </p>
+      </field>
+      <field name="endLine" optional="true">
+        <ref>int</ref>
+        <p>
+          The one-based index of the line containing the character immediately
+          following the range.
+        </p>
+      </field>
+      <field name="endColumn" optional="true">
+        <ref>int</ref>
+        <p>
+          The one-based index of the column containing the character immediately
+          following the range.
         </p>
       </field>
     </object>
@@ -1456,6 +1478,13 @@
         <p>
           The position that should be selected after the edits have been
           applied.
+        </p>
+      </field>
+      <field name="selectionLength" optional="true">
+        <ref>int</ref>
+        <p>
+          The length of the selection (starting at Position) that should be selected after
+          the edits have been applied.
         </p>
       </field>
       <field name="id" optional="true">
