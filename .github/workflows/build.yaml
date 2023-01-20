@@ -1,9 +1,11 @@
 name: Buid
+
 on:
   pull_request:
   push:
     branches:
-      - master
+      - main
+
 jobs:
   test:
     name: Run tests ${{matrix.sdk}} on ${{matrix.os}}
