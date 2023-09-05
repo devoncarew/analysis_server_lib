@@ -4,5 +4,6 @@ include: package:lints/core.yaml
 linter:
   rules:
     - always_declare_return_types
+    - annotate_overrides
     - unnecessary_new
     - use_function_type_syntax_for_parameters

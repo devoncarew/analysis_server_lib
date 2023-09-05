@@ -246,6 +246,7 @@ main() async {
     }
   }
 
+  @override
   String toString() => domains.toString();
 }
 
@@ -348,6 +349,7 @@ class Domain {
     }
   }
 
+  @override
   String toString() => "Domain '${name}': ${requests}";
 }
 
@@ -491,6 +493,7 @@ class Request {
     return '${titleCase(method)}Result';
   }
 
+  @override
   String toString() => 'Request ${method}()';
 }
 
@@ -592,8 +595,10 @@ class Field implements Comparable {
 
   bool get isJsonable => type.isCallParam();
 
+  @override
   String toString() => name;
 
+  @override
   int compareTo(other) {
     if (other is! Field) return 0;
     if (!optional && other.optional) return -1;
@@ -664,6 +669,7 @@ class Refactoring {
       gen.writeln();
 
       // toMap
+      gen.writeln('@override');
       gen.write("Map toMap() => _stripNullValues({");
       gen.write(optionsFields.map((f) => "'${f.name}': ${f.name}").join(', '));
       gen.writeStatement("});");
@@ -822,18 +828,21 @@ class TypeDef {
         }
         return "'${f.name}': ${f.name}";
       }).join(', ');
+      gen.writeln('@override');
       gen.writeln("Map toMap() => _stripNullValues({${map}});");
     }
 
     if (hasEquals) {
       gen.writeln();
       String str = fields.map((f) => "${f.name} == o.${f.name}").join(' && ');
+      gen.writeln('@override');
       gen.writeln("bool operator==(o) => o is ${name} && ${str};");
       gen.writeln();
       String str2 = fields
           .where((f) => !f.optional)
           .map((f) => "${f.name}.hashCode")
           .join(' ^ ');
+      gen.writeln('@override');
       gen.writeln("int get hashCode => ${str2};");
     }
 
@@ -843,6 +852,7 @@ class TypeDef {
           .where((f) => (!f.optional && !f.deprecated))
           .map((f) => "${f.name}: \${${f.name}}")
           .join(', ');
+      gen.writeln('@override');
       gen.writeln("String toString() => '[${name} ${str}]';");
     }
 
@@ -853,6 +863,7 @@ class TypeDef {
 
   bool get hasToString => _shouldHaveToString.contains(name);
 
+  @override
   String toString() => 'TypeDef ${name}';
 }
 
@@ -892,6 +903,7 @@ abstract class Type {
 
   bool get isMap => typeName == 'Map' || typeName.startsWith('Map<');
 
+  @override
   String toString() => typeName;
 }
 
@@ -900,8 +912,10 @@ class ListType extends Type {
 
   ListType(Element element) : subType = Type.create(element);
 
+  @override
   String get typeName => 'List<${subType.typeName}>';
 
+  @override
   String jsonConvert(String ref, {bool isOptional = false}) {
     if (subType is PrimitiveType) {
       String code = 'List.from(${ref})';
@@ -918,6 +932,7 @@ class ListType extends Type {
     return isOptional ? "${ref} == null ? null : $code" : code;
   }
 
+  @override
   void setCallParam() => subType.setCallParam();
 }
 
@@ -929,10 +944,13 @@ class MapType extends Type {
       : key = Type.create(keyElement),
         value = Type.create(valueElement);
 
+  @override
   String get typeName => 'Map<${key.typeName}, ${value.typeName}>';
 
+  @override
   String jsonConvert(String ref, {bool isOptional = false}) => ref;
 
+  @override
   void setCallParam() {
     key.setCallParam();
     value.setCallParam();
@@ -951,12 +969,14 @@ class RefType extends Type {
     return ref.isString;
   }
 
+  @override
   String get typeName {
     if (this.ref == null) _resolve();
     TypeDef ref = this.ref!;
     return ref.isString ? 'String' : ref.name;
   }
 
+  @override
   String jsonConvert(String r, {bool isOptional = false}) {
     if (this.ref == null) _resolve();
     TypeDef ref = this.ref!;
@@ -974,12 +994,14 @@ class RefType extends Type {
     }
   }
 
+  @override
   void setCallParam() {
     if (this.ref == null) _resolve();
     TypeDef ref = this.ref!;
     ref.setCallParam();
   }
 
+  @override
   bool isCallParam() => ref!.isCallParam();
 
   void _resolve() {
@@ -997,22 +1019,28 @@ class PrimitiveType extends Type {
 
   PrimitiveType(this.type);
 
+  @override
   String get typeName => type == 'long' ? 'int' : type;
 
+  @override
   String jsonConvert(String ref, {bool isOptional = false}) => ref;
 
+  @override
   void setCallParam() {}
 }
 
 class _ConcatTextVisitor extends TreeVisitor {
   final StringBuffer buffer = StringBuffer();
 
+  @override
   String toString() => buffer.toString();
 
+  @override
   void visitText(Text node) {
     buffer.write(node.data);
   }
 
+  @override
   void visitElement(Element node) {
     if (node.localName == 'b') {
       buffer.write('**${node.text}**');
@@ -1232,6 +1260,7 @@ abstract class Domain {
     }
   }
 
+  @override
   String toString() => 'Domain ${name}';
 }
 
@@ -1260,6 +1289,7 @@ class RequestError {
 
   RequestError(this.method, this.code, this.message, {this.stackTrace});
 
+  @override
   String toString() => '[Analyzer RequestError method: ${method}, code: ${code}, message: ${message}]';
 }
 

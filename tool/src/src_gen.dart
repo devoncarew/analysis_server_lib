@@ -117,6 +117,7 @@ class DartGenerator {
     }
   }
 
+  @override
   String toString() => _buf.toString();
 }
 
