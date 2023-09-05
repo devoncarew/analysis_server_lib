@@ -1,9 +1,7 @@
-# analysis_server_lib
-
-A library to access Dart's analysis server API.
-
 [![Buid status](https://github.com/devoncarew/analysis_server_lib/actions/workflows/build.yaml/badge.svg)](https://github.com/devoncarew/analysis_server_lib/actions/workflows/build.yaml)
 [![pub package](https://img.shields.io/pub/v/analysis_server_lib.svg)](https://pub.dev/packages/analysis_server_lib)
+
+A library to access Dart's analysis server API.
 
 ## What is the analysis server?
 
@@ -22,7 +20,7 @@ Here's a simple example of starting and communicating with the server:
 ```dart
 import 'package:analysis_server_lib/analysis_server_lib.dart';
 
-main() async {
+void main() async {
   AnalysisServer server = await AnalysisServer.create();
   await server.server.onConnected.first;
 
