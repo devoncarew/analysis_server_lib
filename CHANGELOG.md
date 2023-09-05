@@ -1,3 +1,7 @@
+# 0.2.5
+
+- Update to the `1.34.0` version of the analysis server spec.
+
 # 0.2.4
 
 - Update to the `1.33.4` version of the analysis server spec.
