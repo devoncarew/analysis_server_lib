@@ -1,6 +1,8 @@
 include: package:lints/core.yaml
+# include: package:lints/recommended.yaml
 
 linter:
   rules:
     - always_declare_return_types
+    - unnecessary_new
     - use_function_type_syntax_for_parameters
