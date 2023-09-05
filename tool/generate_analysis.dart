@@ -15,7 +15,7 @@ late Api api;
 
 void main(List<String> args) {
   // Parse spec_input.html into a model.
-  File file = new File('tool/spec_input.html');
+  File file = File('tool/spec_input.html');
   Document document = parse(file.readAsStringSync());
   print('Parsed ${file.path}.');
   Element body = document.body!;
@@ -29,7 +29,7 @@ void main(List<String> args) {
       .getElementsByTagName('refactoring');
 
   // Common common_types_spec.html.
-  File commonTypesFile = new File('tool/common_types_spec.html');
+  File commonTypesFile = File('tool/common_types_spec.html');
   Document commonTypesDoc = parse(commonTypesFile.readAsStringSync());
   print('Parsed ${commonTypesFile.path}.');
   List<Element> commonTypedefs = commonTypesDoc.body!
@@ -42,12 +42,12 @@ void main(List<String> args) {
     return a.attributes['name']!.compareTo(b.attributes['name']!);
   });
 
-  api = new Api(ver.text);
+  api = Api(ver.text);
   api.parse(domains, combinedTypeDefs, refactorings);
 
   // Generate code from the model.
-  File outputFile = new File('lib/analysis_server_lib.dart');
-  DartGenerator generator = new DartGenerator();
+  File outputFile = File('lib/analysis_server_lib.dart');
+  DartGenerator generator = DartGenerator();
   api.generate(generator);
   outputFile.writeAsStringSync(generator.toString());
   var dartFmtResult =
@@ -69,12 +69,9 @@ class Api {
 
   void parse(List<Element> domainElements, List<Element> typeElements,
       List<Element> refactoringElements) {
-    typedefs =
-        new List.from(typeElements.map((element) => new TypeDef(element)));
-    domains =
-        new List.from(domainElements.map((element) => new Domain(element)));
-    refactorings =
-        new List.from(refactoringElements.map((e) => new Refactoring(e)));
+    typedefs = List.from(typeElements.map((element) => TypeDef(element)));
+    domains = List.from(domainElements.map((element) => Domain(element)));
+    refactorings = List.from(refactoringElements.map((e) => Refactoring(e)));
 
     // Mark some types as jsonable - we can send them back over the wire.
     findRef('SourceEdit').setCallParam();
@@ -125,12 +122,12 @@ main() async {
     gen.writeStatement('Map<String, Completer> _completers = {};');
     gen.writeStatement('Map<String, String> _methodNames = {};');
     gen.writeln(
-        'JsonCodec _jsonEncoder = new JsonCodec(toEncodable: _toEncodable);');
+        'JsonCodec _jsonEncoder = JsonCodec(toEncodable: _toEncodable);');
     gen.writeStatement('Map<String, Domain> _domains = {};');
     gen.writeln(
-        "StreamController<String> _onSend = new StreamController.broadcast();");
+        "StreamController<String> _onSend = StreamController.broadcast();");
     gen.writeln(
-        "StreamController<String> _onReceive = new StreamController.broadcast();");
+        "StreamController<String> _onReceive = StreamController.broadcast();");
     gen.writeln("MethodSend? _willSend;");
     gen.writeln();
     domains.forEach((Domain domain) => gen.writeln(
@@ -207,11 +204,11 @@ main() async {
       gen.writeDocs('Feedback class for the `${refactor.kind}` refactoring.');
       gen.writeStatement('class ${name} extends RefactoringFeedback {');
       gen.write('static ${name} parse(Map m) => ');
-      gen.write('new ${name}(');
+      gen.write('${name}(');
       gen.write(fields.map((Field field) {
         String val = "m['${field.name}']";
         if (field.type.isMap) {
-          val = 'new Map.from($val)';
+          val = 'Map.from($val)';
         }
 
         if (field.optional) {
@@ -234,7 +231,7 @@ main() async {
       gen.writeln();
       gen.write('${name}(');
       gen.write(fields.map((field) {
-        StringBuffer buf = new StringBuffer();
+        StringBuffer buf = StringBuffer();
         if (field.optional && fields.firstWhere((a) => a.optional) == field) {
           buf.write('{');
         }
@@ -259,7 +256,7 @@ class Domain {
 
   late List<Request> requests;
   late List<Notification> notifications;
-  Map<String, List<Field>> resultClasses = new LinkedHashMap();
+  Map<String, List<Field>> resultClasses = LinkedHashMap();
 
   Domain(Element element) {
     name = element.attributes['name']!;
@@ -267,11 +264,11 @@ class Domain {
     docs = _collectDocs(element);
     requests = element
         .getElementsByTagName('request')
-        .map((element) => new Request(this, element))
+        .map((element) => Request(this, element))
         .toList();
     notifications = element
         .getElementsByTagName('notification')
-        .map((element) => new Notification(this, element))
+        .map((element) => Notification(this, element))
         .toList();
   }
 
@@ -309,11 +306,11 @@ class Domain {
       } else {
         gen.write('static ${name} parse(Map m) => ');
       }
-      gen.write('new ${name}(');
+      gen.write('${name}(');
       gen.write(fields.map((Field field) {
         String val = "m['${field.name}']";
         if (field.type.isMap) {
-          val = 'new Map.from($val)';
+          val = 'Map.from($val)';
         }
 
         if (field.optional) {
@@ -336,7 +333,7 @@ class Domain {
       gen.writeln();
       gen.write('${name}(');
       gen.write(fields.map((field) {
-        StringBuffer buf = new StringBuffer();
+        StringBuffer buf = StringBuffer();
         if (field.optional && fields.firstWhere((a) => a.optional) == field) {
           buf.write('{');
         }
@@ -373,16 +370,16 @@ class Request {
 
     List<Element> paramsList = element.getElementsByTagName('params');
     if (paramsList.isNotEmpty) {
-      args = new List.from(paramsList.first
+      args = List.from(paramsList.first
           .getElementsByTagName('field')
-          .map((field) => new Field(field)));
+          .map((field) => Field(field)));
     }
 
     List<Element> resultsList = element.getElementsByTagName('result');
     if (resultsList.isNotEmpty) {
-      results = new List.from(resultsList.first
+      results = List.from(resultsList.first
           .getElementsByTagName('field')
-          .map((field) => new Field(field)));
+          .map((field) => Field(field)));
     }
   }
 
@@ -438,7 +435,7 @@ class Request {
       gen.write('Future<${resultName}> ${method}(');
     }
     gen.write(args.map((arg) {
-      StringBuffer buf = new StringBuffer();
+      StringBuffer buf = StringBuffer();
       if (arg.optional && args.firstWhere((a) => a.optional) == arg) {
         buf.write('{');
       }
@@ -498,7 +495,7 @@ class Request {
 }
 
 class Notification {
-  static Set<String> disambiguateEvents = new Set.from(['FlutterOutline']);
+  static Set<String> disambiguateEvents = Set.from(['FlutterOutline']);
 
   final Domain domain;
   late String event;
@@ -508,8 +505,8 @@ class Notification {
   Notification(this.domain, Element element) {
     event = element.attributes['event']!;
     docs = _collectDocs(element);
-    fields = new List.from(
-        element.getElementsByTagName('field').map((field) => new Field(field)));
+    fields = List.from(
+        element.getElementsByTagName('field').map((field) => Field(field)));
     fields.sort();
   }
 
@@ -536,7 +533,7 @@ class Notification {
     gen.writeln();
     gen.writeln('class ${className} {');
     gen.write('static ${className} parse(Map m) => ');
-    gen.write('new ${className}(');
+    gen.write('${className}(');
     gen.write(fields.map((Field field) {
       String val = "m['${field.name}']";
       if (field.optional) {
@@ -561,7 +558,7 @@ class Notification {
     gen.writeln();
     gen.write('${className}(');
     gen.write(fields.map((field) {
-      StringBuffer buf = new StringBuffer();
+      StringBuffer buf = StringBuffer();
       if (field.optional && fields.firstWhere((a) => a.optional) == field) {
         buf.write('{');
       }
@@ -629,18 +626,16 @@ class Refactoring {
     // <field name="deleteSource"><ref>bool</ref></field>
     Element? options = element.querySelector('options');
     if (options != null) {
-      optionsFields = new List.from(options
-          .getElementsByTagName('field')
-          .map((field) => new Field(field)));
+      optionsFields = List.from(
+          options.getElementsByTagName('field').map((field) => Field(field)));
     }
 
     // Parse <feedback>
     // <field name="className" optional="true"><ref>String</ref></field>
     Element? feedback = element.querySelector('feedback');
     if (feedback != null) {
-      feedbackFields = new List.from(feedback
-          .getElementsByTagName('field')
-          .map((field) => new Field(field)));
+      feedbackFields = List.from(
+          feedback.getElementsByTagName('field').map((field) => Field(field)));
       feedbackFields.sort();
     }
   }
@@ -678,7 +673,7 @@ class Refactoring {
 }
 
 class TypeDef {
-  static final Set<String> _shouldHaveToString = new Set.from([
+  static final Set<String> _shouldHaveToString = Set.from([
     'SourceEdit',
     'PubStatus',
     'Location',
@@ -696,7 +691,7 @@ class TypeDef {
   ]);
 
   static final Set<String> _shouldHaveEquals =
-      new Set.from(['Location', 'AnalysisError']);
+      Set.from(['Location', 'AnalysisError']);
 
   late String name;
   late bool experimental;
@@ -713,13 +708,13 @@ class TypeDef {
     docs = _collectDocs(element);
 
     // object, enum, ref
-    Set<String> tags = new Set.from(element.children.map((c) => c.localName));
+    Set<String> tags = Set.from(element.children.map((c) => c.localName));
 
     if (tags.contains('object')) {
       Element object = element.getElementsByTagName('object').first;
-      fields = new List.from(
-          object.getElementsByTagName('field').map((f) => new Field(f)))
-        ..sort();
+      fields =
+          List.from(object.getElementsByTagName('field').map((f) => Field(f)))
+            ..sort();
     } else if (tags.contains('enum')) {
       isString = true;
     } else if (tags.contains('ref')) {
@@ -771,7 +766,7 @@ class TypeDef {
     if (callParam) gen.write(' implements Jsonable');
     gen.writeln(' {');
     gen.writeln('static ${name} parse(Map m) {');
-    gen.write('return new ${name}(');
+    gen.write('return ${name}(');
     gen.write(_fields.map((Field field) {
       String val = "m['${field.name}']";
       if (field.optional) {
@@ -800,7 +795,7 @@ class TypeDef {
     gen.writeln();
     gen.write('${name}(');
     gen.write(_fields.map((field) {
-      StringBuffer buf = new StringBuffer();
+      StringBuffer buf = StringBuffer();
       if (field.optional && fields.firstWhere((a) => a.optional) == field) {
         buf.write('{');
       }
@@ -873,17 +868,17 @@ abstract class Type {
           text == 'String' ||
           text == 'double' ||
           text == 'long') {
-        return new PrimitiveType(text);
+        return PrimitiveType(text);
       } else {
-        return new RefType(text);
+        return RefType(text);
       }
     } else if (element.localName == 'list') {
-      return new ListType(element.children.first);
+      return ListType(element.children.first);
     } else if (element.localName == 'map') {
-      return new MapType(element.children[0].children.first,
+      return MapType(element.children[0].children.first,
           element.children[1].children.first);
     } else if (element.localName == 'union') {
-      return new PrimitiveType('dynamic');
+      return PrimitiveType('dynamic');
     } else {
       throw 'unknown type: ${element}';
     }
@@ -909,17 +904,17 @@ class ListType extends Type {
 
   String jsonConvert(String ref, {bool isOptional = false}) {
     if (subType is PrimitiveType) {
-      String code = 'new List.from(${ref})';
+      String code = 'List.from(${ref})';
       return isOptional ? "${ref} == null ? null : $code" : code;
     }
 
     if (subType is RefType && (subType as RefType).isString) {
-      String code = 'new List.from(${ref})';
+      String code = 'List.from(${ref})';
       return isOptional ? "${ref} == null ? null : $code" : code;
     }
 
     String code =
-        'new List.from(${ref}.map((obj) => ${subType.jsonConvert('obj', isOptional: false)}))';
+        'List.from(${ref}.map((obj) => ${subType.jsonConvert('obj', isOptional: false)}))';
     return isOptional ? "${ref} == null ? null : $code" : code;
   }
 
@@ -1010,7 +1005,7 @@ class PrimitiveType extends Type {
 }
 
 class _ConcatTextVisitor extends TreeVisitor {
-  final StringBuffer buffer = new StringBuffer();
+  final StringBuffer buffer = StringBuffer();
 
   String toString() => buffer.toString();
 
@@ -1031,12 +1026,12 @@ class _ConcatTextVisitor extends TreeVisitor {
   }
 }
 
-final RegExp _wsRegexp = new RegExp(r'\s+', multiLine: true);
+final RegExp _wsRegexp = RegExp(r'\s+', multiLine: true);
 
 String? _collectDocs(Element element) {
   String str =
       element.children.where((e) => e.localName == 'p').map((Element e) {
-    _ConcatTextVisitor visitor = new _ConcatTextVisitor();
+    _ConcatTextVisitor visitor = _ConcatTextVisitor();
     visitor.visit(e);
     return visitor.toString().trim().replaceAll(_wsRegexp, ' ');
   }).join('\n\n');
@@ -1067,7 +1062,7 @@ import 'package:path/path.dart' as path;
 /// @experimental
 const String experimental = 'experimental';
 
-final Logger _logger = new Logger('analysis_server');
+final Logger _logger = Logger('analysis_server');
 
 ''';
 
@@ -1085,7 +1080,7 @@ final String _staticFactory = r'''
        List<String>? vmArgs, List<String>? serverArgs,
        String? clientId, String? clientVersion,
       Map<String, String>? processEnvironment}) async {
-    Completer<int> processCompleter = new Completer();
+    Completer<int> processCompleter = Completer();
 
     String vmPath;
     if (sdkPath != null) {
@@ -1117,7 +1112,7 @@ final String _staticFactory = r'''
       return message;
     });
 
-    AnalysisServer server = new AnalysisServer(inStream, (String message) {
+    AnalysisServer server = AnalysisServer(inStream, (String message) {
       if (onWrite != null) onWrite(message);
       process.stdin.writeln(message);
     }, processCompleter, process.kill);
@@ -1193,7 +1188,7 @@ final String _serverCode = r'''
 
   Future<Map> _call(String method, [Map? args]) {
     String id = '${++_id}';
-    Completer<Map> completer = _completers[id] = new Completer<Map>();
+    Completer<Map> completer = _completers[id] = Completer<Map>();
     _methodNames[id] = method;
     final Map m = {'id': id, 'method': method};
     if (args != null) m['params'] = args;
@@ -1223,7 +1218,7 @@ abstract class Domain {
 
   Stream<E> _listen<E>(String name, E Function(Map) cvt) {
     if (_streams[name] == null) {
-      StreamController<Map> controller = _controllers[name] = new StreamController<Map>.broadcast();
+      StreamController<Map> controller = _controllers[name] = StreamController<Map>.broadcast();
       _streams[name] = controller.stream.map<E>(cvt);
     }
 
@@ -1255,7 +1250,7 @@ abstract class ContentOverlayType {
 
 class RequestError {
   static RequestError parse(String method, Map m) {
-    return new RequestError(method, m['code'], m['message'], stackTrace: m['stackTrace']);
+    return RequestError(method, m['code'], m['message'], stackTrace: m['stackTrace']);
   }
 
   final String method;

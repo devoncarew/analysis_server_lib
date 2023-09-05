@@ -44,7 +44,7 @@ main() {
         0,
         0,
         false,
-        options: new RenameRefactoringOptions(newName: 'bar'),
+        options: RenameRefactoringOptions(newName: 'bar'),
       );
 
       expect(result!.initialProblems, isEmpty);

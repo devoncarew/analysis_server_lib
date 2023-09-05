@@ -21,7 +21,7 @@ import 'package:path/path.dart' as path;
 /// @experimental
 const String experimental = 'experimental';
 
-final Logger _logger = new Logger('analysis_server');
+final Logger _logger = Logger('analysis_server');
 
 const String generatedProtocolVersion = '1.34.0';
 
@@ -62,7 +62,7 @@ class AnalysisServer {
       String? clientId,
       String? clientVersion,
       Map<String, String>? processEnvironment}) async {
-    Completer<int> processCompleter = new Completer();
+    Completer<int> processCompleter = Completer();
 
     String vmPath;
     if (sdkPath != null) {
@@ -96,7 +96,7 @@ class AnalysisServer {
       return message;
     });
 
-    AnalysisServer server = new AnalysisServer(inStream, (String message) {
+    AnalysisServer server = AnalysisServer(inStream, (String message) {
       if (onWrite != null) onWrite(message);
       process.stdin.writeln(message);
     }, processCompleter, process.kill);
@@ -112,10 +112,10 @@ class AnalysisServer {
   int _id = 0;
   Map<String, Completer> _completers = {};
   Map<String, String> _methodNames = {};
-  JsonCodec _jsonEncoder = new JsonCodec(toEncodable: _toEncodable);
+  JsonCodec _jsonEncoder = JsonCodec(toEncodable: _toEncodable);
   Map<String, Domain> _domains = {};
-  StreamController<String> _onSend = new StreamController.broadcast();
-  StreamController<String> _onReceive = new StreamController.broadcast();
+  StreamController<String> _onSend = StreamController.broadcast();
+  StreamController<String> _onReceive = StreamController.broadcast();
   MethodSend? _willSend;
 
   late final ServerDomain _server = ServerDomain(this);
@@ -211,7 +211,7 @@ class AnalysisServer {
 
   Future<Map> _call(String method, [Map? args]) {
     String id = '${++_id}';
-    Completer<Map> completer = _completers[id] = new Completer<Map>();
+    Completer<Map> completer = _completers[id] = Completer<Map>();
     _methodNames[id] = method;
     final Map m = {'id': id, 'method': method};
     if (args != null) m['params'] = args;
@@ -241,7 +241,7 @@ abstract class Domain {
   Stream<E> _listen<E>(String name, E Function(Map) cvt) {
     if (_streams[name] == null) {
       StreamController<Map> controller =
-          _controllers[name] = new StreamController<Map>.broadcast();
+          _controllers[name] = StreamController<Map>.broadcast();
       _streams[name] = controller.stream.map<E>(cvt);
     }
 
@@ -272,7 +272,7 @@ abstract class ContentOverlayType {
 
 class RequestError {
   static RequestError parse(String method, Map m) {
-    return new RequestError(method, m['code'], m['message'],
+    return RequestError(method, m['code'], m['message'],
         stackTrace: m['stackTrace']);
   }
 
@@ -410,7 +410,7 @@ class ServerDomain extends Domain {
 
 class ServerConnected {
   static ServerConnected parse(Map m) =>
-      new ServerConnected(m['version'], m['pid']);
+      ServerConnected(m['version'], m['pid']);
 
   /// The version number of the analysis server.
   final String version;
@@ -423,7 +423,7 @@ class ServerConnected {
 
 class ServerError {
   static ServerError parse(Map m) =>
-      new ServerError(m['isFatal'], m['message'], m['stackTrace']);
+      ServerError(m['isFatal'], m['message'], m['stackTrace']);
 
   /// True if the error is a fatal error, meaning that the server will shutdown
   /// automatically after sending this notification.
@@ -440,8 +440,7 @@ class ServerError {
 }
 
 class ServerLog {
-  static ServerLog parse(Map m) =>
-      new ServerLog(ServerLogEntry.parse(m['entry']));
+  static ServerLog parse(Map m) => ServerLog(ServerLogEntry.parse(m['entry']));
 
   final ServerLogEntry entry;
 
@@ -449,7 +448,7 @@ class ServerLog {
 }
 
 class ServerStatus {
-  static ServerStatus parse(Map m) => new ServerStatus(
+  static ServerStatus parse(Map m) => ServerStatus(
       analysis:
           m['analysis'] == null ? null : AnalysisStatus.parse(m['analysis']),
       pub: m['pub'] == null ? null : PubStatus.parse(m['pub']));
@@ -464,7 +463,7 @@ class ServerStatus {
 }
 
 class VersionResult {
-  static VersionResult parse(Map m) => new VersionResult(m['version']);
+  static VersionResult parse(Map m) => VersionResult(m['version']);
 
   /// The version number of the analysis server.
   final String version;
@@ -474,7 +473,7 @@ class VersionResult {
 
 class ShowMessageRequestResult {
   static ShowMessageRequestResult parse(Map m) =>
-      new ShowMessageRequestResult(action: m['action']);
+      ShowMessageRequestResult(action: m['action']);
 
   /// The label of the action that was selected by the user. May be omitted or
   /// `null` if the user dismissed the message without clicking an action
@@ -824,7 +823,7 @@ class AnalysisDomain extends Domain {
 
 class AnalysisAnalyzedFiles {
   static AnalysisAnalyzedFiles parse(Map m) =>
-      new AnalysisAnalyzedFiles(new List.from(m['directories']));
+      AnalysisAnalyzedFiles(List.from(m['directories']));
 
   /// A list of the paths of the files that are being analyzed.
   final List<String> directories;
@@ -833,9 +832,8 @@ class AnalysisAnalyzedFiles {
 }
 
 class AnalysisClosingLabels {
-  static AnalysisClosingLabels parse(Map m) => new AnalysisClosingLabels(
-      m['file'],
-      new List.from(m['labels'].map((obj) => ClosingLabel.parse(obj))));
+  static AnalysisClosingLabels parse(Map m) => AnalysisClosingLabels(
+      m['file'], List.from(m['labels'].map((obj) => ClosingLabel.parse(obj))));
 
   /// The file the closing labels relate to.
   final String file;
@@ -853,8 +851,8 @@ class AnalysisClosingLabels {
 }
 
 class AnalysisErrors {
-  static AnalysisErrors parse(Map m) => new AnalysisErrors(m['file'],
-      new List.from(m['errors'].map((obj) => AnalysisError.parse(obj))));
+  static AnalysisErrors parse(Map m) => AnalysisErrors(
+      m['file'], List.from(m['errors'].map((obj) => AnalysisError.parse(obj))));
 
   /// The file containing the errors.
   final String file;
@@ -867,7 +865,7 @@ class AnalysisErrors {
 
 class AnalysisFlushResults {
   static AnalysisFlushResults parse(Map m) =>
-      new AnalysisFlushResults(new List.from(m['files']));
+      AnalysisFlushResults(List.from(m['files']));
 
   /// The files that are no longer being analyzed.
   final List<String> files;
@@ -876,8 +874,8 @@ class AnalysisFlushResults {
 }
 
 class AnalysisFolding {
-  static AnalysisFolding parse(Map m) => new AnalysisFolding(m['file'],
-      new List.from(m['regions'].map((obj) => FoldingRegion.parse(obj))));
+  static AnalysisFolding parse(Map m) => AnalysisFolding(m['file'],
+      List.from(m['regions'].map((obj) => FoldingRegion.parse(obj))));
 
   /// The file containing the folding regions.
   final String file;
@@ -889,8 +887,8 @@ class AnalysisFolding {
 }
 
 class AnalysisHighlights {
-  static AnalysisHighlights parse(Map m) => new AnalysisHighlights(m['file'],
-      new List.from(m['regions'].map((obj) => HighlightRegion.parse(obj))));
+  static AnalysisHighlights parse(Map m) => AnalysisHighlights(m['file'],
+      List.from(m['regions'].map((obj) => HighlightRegion.parse(obj))));
 
   /// The file containing the highlight regions.
   final String file;
@@ -906,10 +904,10 @@ class AnalysisHighlights {
 }
 
 class AnalysisImplemented {
-  static AnalysisImplemented parse(Map m) => new AnalysisImplemented(
+  static AnalysisImplemented parse(Map m) => AnalysisImplemented(
       m['file'],
-      new List.from(m['classes'].map((obj) => ImplementedClass.parse(obj))),
-      new List.from(m['members'].map((obj) => ImplementedMember.parse(obj))));
+      List.from(m['classes'].map((obj) => ImplementedClass.parse(obj))),
+      List.from(m['members'].map((obj) => ImplementedMember.parse(obj))));
 
   /// The file with which the implementations are associated.
   final String file;
@@ -925,7 +923,7 @@ class AnalysisImplemented {
 
 class AnalysisInvalidate {
   static AnalysisInvalidate parse(Map m) =>
-      new AnalysisInvalidate(m['file'], m['offset'], m['length'], m['delta']);
+      AnalysisInvalidate(m['file'], m['offset'], m['length'], m['delta']);
 
   /// The file whose information has been invalidated.
   final String file;
@@ -945,11 +943,11 @@ class AnalysisInvalidate {
 }
 
 class AnalysisNavigation {
-  static AnalysisNavigation parse(Map m) => new AnalysisNavigation(
+  static AnalysisNavigation parse(Map m) => AnalysisNavigation(
       m['file'],
-      new List.from(m['regions'].map((obj) => NavigationRegion.parse(obj))),
-      new List.from(m['targets'].map((obj) => NavigationTarget.parse(obj))),
-      new List.from(m['files']));
+      List.from(m['regions'].map((obj) => NavigationRegion.parse(obj))),
+      List.from(m['targets'].map((obj) => NavigationTarget.parse(obj))),
+      List.from(m['files']));
 
   /// The file containing the navigation regions.
   final String file;
@@ -975,8 +973,8 @@ class AnalysisNavigation {
 }
 
 class AnalysisOccurrences {
-  static AnalysisOccurrences parse(Map m) => new AnalysisOccurrences(m['file'],
-      new List.from(m['occurrences'].map((obj) => Occurrences.parse(obj))));
+  static AnalysisOccurrences parse(Map m) => AnalysisOccurrences(m['file'],
+      List.from(m['occurrences'].map((obj) => Occurrences.parse(obj))));
 
   /// The file in which the references occur.
   final String file;
@@ -989,7 +987,7 @@ class AnalysisOccurrences {
 
 class AnalysisOutline {
   static AnalysisOutline parse(Map m) =>
-      new AnalysisOutline(m['file'], m['kind'], Outline.parse(m['outline']),
+      AnalysisOutline(m['file'], m['kind'], Outline.parse(m['outline']),
           libraryName: m['libraryName']);
 
   /// The file with which the outline is associated.
@@ -1012,8 +1010,8 @@ class AnalysisOutline {
 }
 
 class AnalysisOverrides {
-  static AnalysisOverrides parse(Map m) => new AnalysisOverrides(m['file'],
-      new List.from(m['overrides'].map((obj) => Override.parse(obj))));
+  static AnalysisOverrides parse(Map m) => AnalysisOverrides(
+      m['file'], List.from(m['overrides'].map((obj) => Override.parse(obj))));
 
   /// The file with which the overrides are associated.
   final String file;
@@ -1025,8 +1023,8 @@ class AnalysisOverrides {
 }
 
 class ErrorsResult {
-  static ErrorsResult parse(Map m) => new ErrorsResult(
-      new List.from(m['errors'].map((obj) => AnalysisError.parse(obj))));
+  static ErrorsResult parse(Map m) => ErrorsResult(
+      List.from(m['errors'].map((obj) => AnalysisError.parse(obj))));
 
   /// The errors associated with the file.
   final List<AnalysisError> errors;
@@ -1035,8 +1033,8 @@ class ErrorsResult {
 }
 
 class HoverResult {
-  static HoverResult parse(Map m) => new HoverResult(
-      new List.from(m['hovers'].map((obj) => HoverInformation.parse(obj))));
+  static HoverResult parse(Map m) => HoverResult(
+      List.from(m['hovers'].map((obj) => HoverInformation.parse(obj))));
 
   /// The hover information associated with the location. The list will be empty
   /// if no information could be determined for the location. The list can
@@ -1049,8 +1047,8 @@ class HoverResult {
 }
 
 class ImportedElementsResult {
-  static ImportedElementsResult parse(Map m) => new ImportedElementsResult(
-      new List.from(m['elements'].map((obj) => ImportedElements.parse(obj))));
+  static ImportedElementsResult parse(Map m) => ImportedElementsResult(
+      List.from(m['elements'].map((obj) => ImportedElements.parse(obj))));
 
   /// The information about the elements that are referenced in the specified
   /// region of the specified file that come from imported libraries.
@@ -1060,9 +1058,8 @@ class ImportedElementsResult {
 }
 
 class LibraryDependenciesResult {
-  static LibraryDependenciesResult parse(Map m) =>
-      new LibraryDependenciesResult(
-          new List.from(m['libraries']), new Map.from(m['packageMap']));
+  static LibraryDependenciesResult parse(Map m) => LibraryDependenciesResult(
+      List.from(m['libraries']), Map.from(m['packageMap']));
 
   /// A list of the paths of library elements referenced by files in existing
   /// analysis roots.
@@ -1076,10 +1073,10 @@ class LibraryDependenciesResult {
 }
 
 class NavigationResult {
-  static NavigationResult parse(Map m) => new NavigationResult(
-      new List.from(m['files']),
-      new List.from(m['targets'].map((obj) => NavigationTarget.parse(obj))),
-      new List.from(m['regions'].map((obj) => NavigationRegion.parse(obj))));
+  static NavigationResult parse(Map m) => NavigationResult(
+      List.from(m['files']),
+      List.from(m['targets'].map((obj) => NavigationTarget.parse(obj))),
+      List.from(m['regions'].map((obj) => NavigationRegion.parse(obj))));
 
   /// A list of the paths of files that are referenced by the navigation
   /// targets.
@@ -1097,7 +1094,7 @@ class NavigationResult {
 
 class ReachableSourcesResult {
   static ReachableSourcesResult parse(Map m) =>
-      new ReachableSourcesResult(new Map.from(m['sources']));
+      ReachableSourcesResult(Map.from(m['sources']));
 
   /// A mapping from source URIs to directly reachable source URIs. For example,
   /// a file "foo.dart" that imports "bar.dart" would have the corresponding
@@ -1111,8 +1108,8 @@ class ReachableSourcesResult {
 }
 
 class SignatureResult {
-  static SignatureResult parse(Map m) => new SignatureResult(m['name'],
-      new List.from(m['parameters'].map((obj) => ParameterInfo.parse(obj))),
+  static SignatureResult parse(Map m) => SignatureResult(m['name'],
+      List.from(m['parameters'].map((obj) => ParameterInfo.parse(obj))),
       dartdoc: m['dartdoc']);
 
   /// The name of the function being invoked at the given offset.
@@ -1240,24 +1237,24 @@ class CompletionDomain extends Domain {
 }
 
 class CompletionResults {
-  static CompletionResults parse(Map m) => new CompletionResults(
+  static CompletionResults parse(Map m) => CompletionResults(
       m['id'],
       m['replacementOffset'],
       m['replacementLength'],
-      new List.from(m['results'].map((obj) => CompletionSuggestion.parse(obj))),
+      List.from(m['results'].map((obj) => CompletionSuggestion.parse(obj))),
       m['isLast'],
       libraryFile: m['libraryFile'],
       includedSuggestionSets: m['includedSuggestionSets'] == null
           ? null
-          : new List.from(m['includedSuggestionSets']
+          : List.from(m['includedSuggestionSets']
               .map((obj) => IncludedSuggestionSet.parse(obj))),
       includedElementKinds: m['includedElementKinds'] == null
           ? null
-          : new List.from(m['includedElementKinds']),
+          : List.from(m['includedElementKinds']),
       includedSuggestionRelevanceTags:
           m['includedSuggestionRelevanceTags'] == null
               ? null
-              : new List.from(m['includedSuggestionRelevanceTags']
+              : List.from(m['includedSuggestionRelevanceTags']
                   .map((obj) => IncludedSuggestionRelevanceTag.parse(obj))));
 
   /// The id associated with the completion.
@@ -1322,14 +1319,14 @@ class CompletionResults {
 
 class CompletionAvailableSuggestions {
   static CompletionAvailableSuggestions parse(Map m) =>
-      new CompletionAvailableSuggestions(
+      CompletionAvailableSuggestions(
           changedLibraries: m['changedLibraries'] == null
               ? null
-              : new List.from(m['changedLibraries']
+              : List.from(m['changedLibraries']
                   .map((obj) => AvailableSuggestionSet.parse(obj))),
           removedLibraries: m['removedLibraries'] == null
               ? null
-              : new List.from(m['removedLibraries']));
+              : List.from(m['removedLibraries']));
 
   /// A list of pre-computed, potential completions coming from this set of
   /// completion suggestions.
@@ -1344,8 +1341,7 @@ class CompletionAvailableSuggestions {
 
 class CompletionExistingImports {
   static CompletionExistingImports parse(Map m) =>
-      new CompletionExistingImports(
-          m['file'], ExistingImports.parse(m['imports']));
+      CompletionExistingImports(m['file'], ExistingImports.parse(m['imports']));
 
   /// The defining file of the library.
   final String file;
@@ -1357,7 +1353,7 @@ class CompletionExistingImports {
 }
 
 class SuggestionsResult {
-  static SuggestionsResult parse(Map m) => new SuggestionsResult(m['id']);
+  static SuggestionsResult parse(Map m) => SuggestionsResult(m['id']);
 
   /// The identifier used to associate results with this completion request.
   final String id;
@@ -1366,11 +1362,10 @@ class SuggestionsResult {
 }
 
 class Suggestions2Result {
-  static Suggestions2Result parse(Map m) => new Suggestions2Result(
+  static Suggestions2Result parse(Map m) => Suggestions2Result(
       m['replacementOffset'],
       m['replacementLength'],
-      new List.from(
-          m['suggestions'].map((obj) => CompletionSuggestion.parse(obj))),
+      List.from(m['suggestions'].map((obj) => CompletionSuggestion.parse(obj))),
       m['isIncomplete']);
 
   /// The offset of the start of the text to be replaced. This will be different
@@ -1406,7 +1401,7 @@ class Suggestions2Result {
 
 class SuggestionDetailsResult {
   static SuggestionDetailsResult parse(Map m) =>
-      new SuggestionDetailsResult(m['completion'],
+      SuggestionDetailsResult(m['completion'],
           change: m['change'] == null ? null : SourceChange.parse(m['change']));
 
   /// The full text to insert, including any optional import prefix.
@@ -1421,7 +1416,7 @@ class SuggestionDetailsResult {
 }
 
 class SuggestionDetails2Result {
-  static SuggestionDetails2Result parse(Map m) => new SuggestionDetails2Result(
+  static SuggestionDetails2Result parse(Map m) => SuggestionDetails2Result(
       m['completion'], SourceChange.parse(m['change']));
 
   /// The full text to insert, which possibly includes now an import prefix. The
@@ -1528,9 +1523,9 @@ class SearchDomain extends Domain {
 }
 
 class SearchResults {
-  static SearchResults parse(Map m) => new SearchResults(
+  static SearchResults parse(Map m) => SearchResults(
       m['id'],
-      new List.from(m['results'].map((obj) => SearchResult.parse(obj))),
+      List.from(m['results'].map((obj) => SearchResult.parse(obj))),
       m['isLast']);
 
   /// The id associated with the search.
@@ -1548,7 +1543,7 @@ class SearchResults {
 
 class FindElementReferencesResult {
   static FindElementReferencesResult parse(Map m) =>
-      new FindElementReferencesResult(
+      FindElementReferencesResult(
           id: m['id'],
           element: m['element'] == null ? null : Element.parse(m['element']));
 
@@ -1569,7 +1564,7 @@ class FindElementReferencesResult {
 
 class FindMemberDeclarationsResult {
   static FindMemberDeclarationsResult parse(Map m) =>
-      new FindMemberDeclarationsResult(m['id']);
+      FindMemberDeclarationsResult(m['id']);
 
   /// The identifier used to associate results with this search request.
   final String id;
@@ -1579,7 +1574,7 @@ class FindMemberDeclarationsResult {
 
 class FindMemberReferencesResult {
   static FindMemberReferencesResult parse(Map m) =>
-      new FindMemberReferencesResult(m['id']);
+      FindMemberReferencesResult(m['id']);
 
   /// The identifier used to associate results with this search request.
   final String id;
@@ -1589,7 +1584,7 @@ class FindMemberReferencesResult {
 
 class FindTopLevelDeclarationsResult {
   static FindTopLevelDeclarationsResult parse(Map m) =>
-      new FindTopLevelDeclarationsResult(m['id']);
+      FindTopLevelDeclarationsResult(m['id']);
 
   /// The identifier used to associate results with this search request.
   final String id;
@@ -1598,11 +1593,9 @@ class FindTopLevelDeclarationsResult {
 }
 
 class ElementDeclarationsResult {
-  static ElementDeclarationsResult parse(Map m) =>
-      new ElementDeclarationsResult(
-          new List.from(
-              m['declarations'].map((obj) => ElementDeclaration.parse(obj))),
-          new List.from(m['files']));
+  static ElementDeclarationsResult parse(Map m) => ElementDeclarationsResult(
+      List.from(m['declarations'].map((obj) => ElementDeclaration.parse(obj))),
+      List.from(m['files']));
 
   /// The list of declarations.
   final List<ElementDeclaration> declarations;
@@ -1614,10 +1607,10 @@ class ElementDeclarationsResult {
 }
 
 class TypeHierarchyResult {
-  static TypeHierarchyResult parse(Map m) => new TypeHierarchyResult(
+  static TypeHierarchyResult parse(Map m) => TypeHierarchyResult(
       hierarchyItems: m['hierarchyItems'] == null
           ? null
-          : new List.from(
+          : List.from(
               m['hierarchyItems'].map((obj) => TypeHierarchyItem.parse(obj))));
 
   /// A list of the types in the requested hierarchy. The first element of the
@@ -1831,8 +1824,8 @@ class EditDomain extends Domain {
 }
 
 class FormatResult {
-  static FormatResult parse(Map m) => new FormatResult(
-      new List.from(m['edits'].map((obj) => SourceEdit.parse(obj))),
+  static FormatResult parse(Map m) => FormatResult(
+      List.from(m['edits'].map((obj) => SourceEdit.parse(obj))),
       m['selectionOffset'],
       m['selectionLength']);
 
@@ -1850,8 +1843,8 @@ class FormatResult {
 }
 
 class FormatIfEnabledResult {
-  static FormatIfEnabledResult parse(Map m) => new FormatIfEnabledResult(
-      new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))));
+  static FormatIfEnabledResult parse(Map m) => FormatIfEnabledResult(
+      List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))));
 
   /// The edit(s) to be applied in order to format the code. The list will be
   /// empty if none of the files were formatted, whether because they were not
@@ -1862,8 +1855,8 @@ class FormatIfEnabledResult {
 }
 
 class AssistsResult {
-  static AssistsResult parse(Map m) => new AssistsResult(
-      new List.from(m['assists'].map((obj) => SourceChange.parse(obj))));
+  static AssistsResult parse(Map m) => AssistsResult(
+      List.from(m['assists'].map((obj) => SourceChange.parse(obj))));
 
   /// The assists that are available at the given location.
   final List<SourceChange> assists;
@@ -1873,7 +1866,7 @@ class AssistsResult {
 
 class AvailableRefactoringsResult {
   static AvailableRefactoringsResult parse(Map m) =>
-      new AvailableRefactoringsResult(new List.from(m['kinds']));
+      AvailableRefactoringsResult(List.from(m['kinds']));
 
   /// The kinds of refactorings that are valid for the given selection.
   final List<String> kinds;
@@ -1882,10 +1875,10 @@ class AvailableRefactoringsResult {
 }
 
 class BulkFixesResult {
-  static BulkFixesResult parse(Map m) => new BulkFixesResult(
+  static BulkFixesResult parse(Map m) => BulkFixesResult(
       m['message'],
-      new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
-      new List.from(m['details'].map((obj) => BulkFix.parse(obj))));
+      List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
+      List.from(m['details'].map((obj) => BulkFix.parse(obj))));
 
   /// An optional message explaining unapplied fixes.
   final String message;
@@ -1900,8 +1893,8 @@ class BulkFixesResult {
 }
 
 class FixesResult {
-  static FixesResult parse(Map m) => new FixesResult(
-      new List.from(m['fixes'].map((obj) => AnalysisErrorFixes.parse(obj))));
+  static FixesResult parse(Map m) => FixesResult(
+      List.from(m['fixes'].map((obj) => AnalysisErrorFixes.parse(obj))));
 
   /// The fixes that are available for the errors at the given offset.
   final List<AnalysisErrorFixes> fixes;
@@ -1911,7 +1904,7 @@ class FixesResult {
 
 class PostfixCompletionResult {
   static PostfixCompletionResult parse(Map m) =>
-      new PostfixCompletionResult(SourceChange.parse(m['change']));
+      PostfixCompletionResult(SourceChange.parse(m['change']));
 
   /// The change to be applied in order to complete the statement.
   final SourceChange change;
@@ -1920,20 +1913,18 @@ class PostfixCompletionResult {
 }
 
 class RefactoringResult {
-  static RefactoringResult? parse(String? kind, Map m) => new RefactoringResult(
-      new List.from(
+  static RefactoringResult? parse(String? kind, Map m) => RefactoringResult(
+      List.from(
           m['initialProblems'].map((obj) => RefactoringProblem.parse(obj))),
-      new List.from(
+      List.from(
           m['optionsProblems'].map((obj) => RefactoringProblem.parse(obj))),
-      new List.from(
-          m['finalProblems'].map((obj) => RefactoringProblem.parse(obj))),
+      List.from(m['finalProblems'].map((obj) => RefactoringProblem.parse(obj))),
       feedback: m['feedback'] == null
           ? null
           : RefactoringFeedback.parse(kind, m['feedback']),
       change: m['change'] == null ? null : SourceChange.parse(m['change']),
-      potentialEdits: m['potentialEdits'] == null
-          ? null
-          : new List.from(m['potentialEdits']));
+      potentialEdits:
+          m['potentialEdits'] == null ? null : List.from(m['potentialEdits']));
 
   /// The initial status of the refactoring, i.e. problems related to the
   /// context in which the refactoring is requested. The array will be empty if
@@ -1976,9 +1967,8 @@ class RefactoringResult {
 }
 
 class StatementCompletionResult {
-  static StatementCompletionResult parse(Map m) =>
-      new StatementCompletionResult(
-          SourceChange.parse(m['change']), m['whitespaceOnly']);
+  static StatementCompletionResult parse(Map m) => StatementCompletionResult(
+      SourceChange.parse(m['change']), m['whitespaceOnly']);
 
   /// The change to be applied in order to complete the statement.
   final SourceChange change;
@@ -1992,7 +1982,7 @@ class StatementCompletionResult {
 
 class IsPostfixCompletionApplicableResult {
   static IsPostfixCompletionApplicableResult parse(Map m) =>
-      new IsPostfixCompletionApplicableResult(m['value']);
+      IsPostfixCompletionApplicableResult(m['value']);
 
   /// True if the template can be expanded at the given location.
   final bool value;
@@ -2002,7 +1992,7 @@ class IsPostfixCompletionApplicableResult {
 
 class ListPostfixCompletionTemplatesResult {
   static ListPostfixCompletionTemplatesResult parse(Map m) =>
-      new ListPostfixCompletionTemplatesResult(new List.from(
+      ListPostfixCompletionTemplatesResult(List.from(
           m['templates'].map((obj) => PostfixTemplateDescriptor.parse(obj))));
 
   /// The list of available templates.
@@ -2012,7 +2002,7 @@ class ListPostfixCompletionTemplatesResult {
 }
 
 class ImportElementsResult {
-  static ImportElementsResult parse(Map m) => new ImportElementsResult(
+  static ImportElementsResult parse(Map m) => ImportElementsResult(
       edit: m['edit'] == null ? null : SourceFileEdit.parse(m['edit']));
 
   /// The edits to be applied in order to make the specified elements
@@ -2028,7 +2018,7 @@ class ImportElementsResult {
 
 class SortMembersResult {
   static SortMembersResult parse(Map m) =>
-      new SortMembersResult(SourceFileEdit.parse(m['edit']));
+      SortMembersResult(SourceFileEdit.parse(m['edit']));
 
   /// The file edit that is to be applied to the given file to effect the
   /// sorting.
@@ -2039,7 +2029,7 @@ class SortMembersResult {
 
 class OrganizeDirectivesResult {
   static OrganizeDirectivesResult parse(Map m) =>
-      new OrganizeDirectivesResult(SourceFileEdit.parse(m['edit']));
+      OrganizeDirectivesResult(SourceFileEdit.parse(m['edit']));
 
   /// The file edit that is to be applied to the given file to effect the
   /// organizing.
@@ -2144,11 +2134,11 @@ class ExecutionDomain extends Domain {
 }
 
 class ExecutionLaunchData {
-  static ExecutionLaunchData parse(Map m) => new ExecutionLaunchData(m['file'],
+  static ExecutionLaunchData parse(Map m) => ExecutionLaunchData(m['file'],
       kind: m['kind'],
       referencedFiles: m['referencedFiles'] == null
           ? null
-          : new List.from(m['referencedFiles']));
+          : List.from(m['referencedFiles']));
 
   /// The file for which launch data is being provided. This will either be a
   /// Dart library or an HTML file.
@@ -2166,7 +2156,7 @@ class ExecutionLaunchData {
 }
 
 class CreateContextResult {
-  static CreateContextResult parse(Map m) => new CreateContextResult(m['id']);
+  static CreateContextResult parse(Map m) => CreateContextResult(m['id']);
 
   /// The identifier used to refer to the execution context that was created.
   final String id;
@@ -2175,14 +2165,14 @@ class CreateContextResult {
 }
 
 class RuntimeSuggestionsResult {
-  static RuntimeSuggestionsResult parse(Map m) => new RuntimeSuggestionsResult(
+  static RuntimeSuggestionsResult parse(Map m) => RuntimeSuggestionsResult(
       suggestions: m['suggestions'] == null
           ? null
-          : new List.from(
+          : List.from(
               m['suggestions'].map((obj) => CompletionSuggestion.parse(obj))),
       expressions: m['expressions'] == null
           ? null
-          : new List.from(m['expressions']
+          : List.from(m['expressions']
               .map((obj) => RuntimeCompletionExpression.parse(obj))));
 
   /// The completion suggestions. In contrast to usual completion request,
@@ -2206,7 +2196,7 @@ class RuntimeSuggestionsResult {
 
 class MapUriResult {
   static MapUriResult parse(Map m) =>
-      new MapUriResult(file: m['file'], uri: m['uri']);
+      MapUriResult(file: m['file'], uri: m['uri']);
 
   /// The file to which the URI was mapped. This field is omitted if the uri
   /// field was not given in the request.
@@ -2238,8 +2228,8 @@ class DiagnosticDomain extends Domain {
 }
 
 class DiagnosticsResult {
-  static DiagnosticsResult parse(Map m) => new DiagnosticsResult(
-      new List.from(m['contexts'].map((obj) => ContextData.parse(obj))));
+  static DiagnosticsResult parse(Map m) => DiagnosticsResult(
+      List.from(m['contexts'].map((obj) => ContextData.parse(obj))));
 
   /// The list of analysis contexts.
   final List<ContextData> contexts;
@@ -2248,7 +2238,7 @@ class DiagnosticsResult {
 }
 
 class ServerPortResult {
-  static ServerPortResult parse(Map m) => new ServerPortResult(m['port']);
+  static ServerPortResult parse(Map m) => ServerPortResult(m['port']);
 
   /// The diagnostic server port.
   final int port;
@@ -2334,7 +2324,7 @@ class AnalyticsDomain extends Domain {
 }
 
 class IsEnabledResult {
-  static IsEnabledResult parse(Map m) => new IsEnabledResult(m['enabled']);
+  static IsEnabledResult parse(Map m) => IsEnabledResult(m['enabled']);
 
   /// Whether sending analytics is enabled or not.
   final bool enabled;
@@ -2418,7 +2408,7 @@ class FlutterDomain extends Domain {
 
 class FlutterOutlineEvent {
   static FlutterOutlineEvent parse(Map m) =>
-      new FlutterOutlineEvent(m['file'], FlutterOutline.parse(m['outline']));
+      FlutterOutlineEvent(m['file'], FlutterOutline.parse(m['outline']));
 
   /// The file with which the outline is associated.
   final String file;
@@ -2431,7 +2421,7 @@ class FlutterOutlineEvent {
 
 class WidgetDescriptionResult {
   static WidgetDescriptionResult parse(Map m) =>
-      new WidgetDescriptionResult(new List.from(
+      WidgetDescriptionResult(List.from(
           m['properties'].map((obj) => FlutterWidgetProperty.parse(obj))));
 
   /// The list of properties of the widget. Some of the properties might be read
@@ -2445,7 +2435,7 @@ class WidgetDescriptionResult {
 
 class SetWidgetPropertyValueResult {
   static SetWidgetPropertyValueResult parse(Map m) =>
-      new SetWidgetPropertyValueResult(SourceChange.parse(m['change']));
+      SetWidgetPropertyValueResult(SourceChange.parse(m['change']));
 
   /// The change that should be applied.
   final SourceChange change;
@@ -2462,7 +2452,7 @@ class SetWidgetPropertyValueResult {
 /// the old overlay is discarded and replaced with the new one.
 class AddContentOverlay extends ContentOverlayType implements Jsonable {
   static AddContentOverlay parse(Map m) {
-    return new AddContentOverlay(m['content']);
+    return AddContentOverlay(m['content']);
   }
 
   /// The new content of the file.
@@ -2477,13 +2467,13 @@ class AddContentOverlay extends ContentOverlayType implements Jsonable {
 /// analysis.
 class AnalysisError {
   static AnalysisError parse(Map m) {
-    return new AnalysisError(m['severity'], m['type'],
+    return AnalysisError(m['severity'], m['type'],
         Location.parse(m['location']), m['message'], m['code'],
         correction: m['correction'],
         url: m['url'],
         contextMessages: m['contextMessages'] == null
             ? null
-            : new List.from(m['contextMessages']
+            : List.from(m['contextMessages']
                 .map((obj) => DiagnosticMessage.parse(obj))),
         hasFix: m['hasFix']);
   }
@@ -2556,8 +2546,8 @@ class AnalysisError {
 /// A list of fixes associated with a specific error.
 class AnalysisErrorFixes {
   static AnalysisErrorFixes parse(Map m) {
-    return new AnalysisErrorFixes(AnalysisError.parse(m['error']),
-        new List.from(m['fixes'].map((obj) => SourceChange.parse(obj))));
+    return AnalysisErrorFixes(AnalysisError.parse(m['error']),
+        List.from(m['fixes'].map((obj) => SourceChange.parse(obj))));
   }
 
   /// The error with which the fixes are associated.
@@ -2572,7 +2562,7 @@ class AnalysisErrorFixes {
 @deprecated
 class AnalysisOptions implements Jsonable {
   static AnalysisOptions parse(Map m) {
-    return new AnalysisOptions(
+    return AnalysisOptions(
         enableAsync: m['enableAsync'],
         enableDeferredLoading: m['enableDeferredLoading'],
         enableEnums: m['enableEnums'],
@@ -2643,7 +2633,7 @@ class AnalysisOptions implements Jsonable {
 /// An indication of the current state of analysis.
 class AnalysisStatus {
   static AnalysisStatus parse(Map m) {
-    return new AnalysisStatus(m['isAnalyzing'],
+    return AnalysisStatus(m['isAnalyzing'],
         analysisTarget: m['analysisTarget']);
   }
 
@@ -2664,22 +2654,19 @@ class AnalysisStatus {
 /// imported library tokens.
 class AvailableSuggestion {
   static AvailableSuggestion parse(Map m) {
-    return new AvailableSuggestion(
+    return AvailableSuggestion(
         m['label'], m['declaringLibraryUri'], Element.parse(m['element']),
         defaultArgumentListString: m['defaultArgumentListString'],
         defaultArgumentListTextRanges:
             m['defaultArgumentListTextRanges'] == null
                 ? null
-                : new List.from(m['defaultArgumentListTextRanges']),
-        parameterNames: m['parameterNames'] == null
-            ? null
-            : new List.from(m['parameterNames']),
-        parameterTypes: m['parameterTypes'] == null
-            ? null
-            : new List.from(m['parameterTypes']),
-        relevanceTags: m['relevanceTags'] == null
-            ? null
-            : new List.from(m['relevanceTags']),
+                : List.from(m['defaultArgumentListTextRanges']),
+        parameterNames:
+            m['parameterNames'] == null ? null : List.from(m['parameterNames']),
+        parameterTypes:
+            m['parameterTypes'] == null ? null : List.from(m['parameterTypes']),
+        relevanceTags:
+            m['relevanceTags'] == null ? null : List.from(m['relevanceTags']),
         requiredParameterCount: m['requiredParameterCount']);
   }
 
@@ -2733,8 +2720,8 @@ class AvailableSuggestion {
 
 class AvailableSuggestionSet {
   static AvailableSuggestionSet parse(Map m) {
-    return new AvailableSuggestionSet(m['id'], m['uri'],
-        new List.from(m['items'].map((obj) => AvailableSuggestion.parse(obj))));
+    return AvailableSuggestionSet(m['id'], m['uri'],
+        List.from(m['items'].map((obj) => AvailableSuggestion.parse(obj))));
   }
 
   /// The id associated with the library.
@@ -2751,8 +2738,8 @@ class AvailableSuggestionSet {
 /// A description of bulk fixes to a library.
 class BulkFix {
   static BulkFix parse(Map m) {
-    return new BulkFix(m['path'],
-        new List.from(m['fixes'].map((obj) => BulkFixDetail.parse(obj))));
+    return BulkFix(m['path'],
+        List.from(m['fixes'].map((obj) => BulkFixDetail.parse(obj))));
   }
 
   /// The path of the library.
@@ -2767,7 +2754,7 @@ class BulkFix {
 /// A description of a fix applied to a library.
 class BulkFixDetail {
   static BulkFixDetail parse(Map m) {
-    return new BulkFixDetail(m['code'], m['occurrences']);
+    return BulkFixDetail(m['code'], m['occurrences']);
   }
 
   /// The code of the diagnostic associated with the fix.
@@ -2796,8 +2783,8 @@ class BulkFixDetail {
 /// of range, an `INVALID_OVERLAY_CHANGE` error will be reported.
 class ChangeContentOverlay extends ContentOverlayType implements Jsonable {
   static ChangeContentOverlay parse(Map m) {
-    return new ChangeContentOverlay(
-        new List.from(m['edits'].map((obj) => SourceEdit.parse(obj))));
+    return ChangeContentOverlay(
+        List.from(m['edits'].map((obj) => SourceEdit.parse(obj))));
   }
 
   /// The edits to be applied to the file.
@@ -2814,7 +2801,7 @@ class ChangeContentOverlay extends ContentOverlayType implements Jsonable {
 /// constructor type/name to be rendered alongside the closing parenthesis.
 class ClosingLabel {
   static ClosingLabel parse(Map m) {
-    return new ClosingLabel(m['offset'], m['length'], m['label']);
+    return ClosingLabel(m['offset'], m['length'], m['label']);
   }
 
   /// The offset of the construct being labelled.
@@ -2833,7 +2820,7 @@ class ClosingLabel {
 /// are optional, depending on the kind of element being suggested.
 class CompletionSuggestion implements Jsonable {
   static CompletionSuggestion parse(Map m) {
-    return new CompletionSuggestion(
+    return CompletionSuggestion(
         m['kind'],
         m['relevance'],
         m['completion'],
@@ -2851,15 +2838,13 @@ class CompletionSuggestion implements Jsonable {
         defaultArgumentListTextRanges:
             m['defaultArgumentListTextRanges'] == null
                 ? null
-                : new List.from(m['defaultArgumentListTextRanges']),
+                : List.from(m['defaultArgumentListTextRanges']),
         element: m['element'] == null ? null : Element.parse(m['element']),
         returnType: m['returnType'],
-        parameterNames: m['parameterNames'] == null
-            ? null
-            : new List.from(m['parameterNames']),
-        parameterTypes: m['parameterTypes'] == null
-            ? null
-            : new List.from(m['parameterTypes']),
+        parameterNames:
+            m['parameterNames'] == null ? null : List.from(m['parameterNames']),
+        parameterTypes:
+            m['parameterTypes'] == null ? null : List.from(m['parameterTypes']),
         requiredParameterCount: m['requiredParameterCount'],
         hasNamedParameters: m['hasNamedParameters'],
         parameterName: m['parameterName'],
@@ -3057,12 +3042,12 @@ class CompletionSuggestion implements Jsonable {
 /// Information about an analysis context.
 class ContextData {
   static ContextData parse(Map m) {
-    return new ContextData(
+    return ContextData(
         m['name'],
         m['explicitFileCount'],
         m['implicitFileCount'],
         m['workItemQueueLength'],
-        new List.from(m['cacheEntryExceptions']));
+        List.from(m['cacheEntryExceptions']));
   }
 
   /// The name of the context.
@@ -3091,7 +3076,7 @@ class ContextData {
 /// indicates where the variable is declared.
 class DiagnosticMessage {
   static DiagnosticMessage parse(Map m) {
-    return new DiagnosticMessage(m['message'], Location.parse(m['location']));
+    return DiagnosticMessage(m['message'], Location.parse(m['location']));
   }
 
   /// The message to be displayed to the user.
@@ -3107,7 +3092,7 @@ class DiagnosticMessage {
 /// Information about an element (something that can be declared in code).
 class Element implements Jsonable {
   static Element parse(Map m) {
-    return new Element(m['kind'], m['name'], m['flags'],
+    return Element(m['kind'], m['name'], m['flags'],
         location: m['location'] == null ? null : Location.parse(m['location']),
         parameters: m['parameters'],
         returnType: m['returnType'],
@@ -3173,8 +3158,8 @@ class Element implements Jsonable {
 /// field, etc).
 class ElementDeclaration {
   static ElementDeclaration parse(Map m) {
-    return new ElementDeclaration(m['name'], m['kind'], m['fileIndex'],
-        m['offset'], m['line'], m['column'], m['codeOffset'], m['codeLength'],
+    return ElementDeclaration(m['name'], m['kind'], m['fileIndex'], m['offset'],
+        m['line'], m['column'], m['codeOffset'], m['codeLength'],
         className: m['className'],
         mixinName: m['mixinName'],
         parameters: m['parameters']);
@@ -3228,7 +3213,7 @@ class ElementDeclaration {
 /// A description of an executable file.
 class ExecutableFile {
   static ExecutableFile parse(Map m) {
-    return new ExecutableFile(m['file'], m['kind']);
+    return ExecutableFile(m['file'], m['kind']);
   }
 
   /// The path of the executable file.
@@ -3243,7 +3228,7 @@ class ExecutableFile {
 /// Information about an existing import, with elements that it provides.
 class ExistingImport {
   static ExistingImport parse(Map m) {
-    return new ExistingImport(m['uri'], new List.from(m['elements']));
+    return ExistingImport(m['uri'], List.from(m['elements']));
   }
 
   /// The URI of the imported library. It is an index in the `strings` field, in
@@ -3260,8 +3245,8 @@ class ExistingImport {
 /// Information about all existing imports in a library.
 class ExistingImports {
   static ExistingImports parse(Map m) {
-    return new ExistingImports(ImportedElementSet.parse(m['elements']),
-        new List.from(m['imports'].map((obj) => ExistingImport.parse(obj))));
+    return ExistingImports(ImportedElementSet.parse(m['elements']),
+        List.from(m['imports'].map((obj) => ExistingImport.parse(obj))));
   }
 
   /// The set of all unique imported elements for all imports.
@@ -3276,22 +3261,21 @@ class ExistingImports {
 /// An node in the Flutter specific outline structure of a file.
 class FlutterOutline {
   static FlutterOutline parse(Map m) {
-    return new FlutterOutline(
+    return FlutterOutline(
         m['kind'], m['offset'], m['length'], m['codeOffset'], m['codeLength'],
         label: m['label'],
         dartElement:
             m['dartElement'] == null ? null : Element.parse(m['dartElement']),
         attributes: m['attributes'] == null
             ? null
-            : new List.from(m['attributes']
+            : List.from(m['attributes']
                 .map((obj) => FlutterOutlineAttribute.parse(obj))),
         className: m['className'],
         parentAssociationLabel: m['parentAssociationLabel'],
         variableName: m['variableName'],
         children: m['children'] == null
             ? null
-            : new List.from(
-                m['children'].map((obj) => FlutterOutline.parse(obj))));
+            : List.from(m['children'].map((obj) => FlutterOutline.parse(obj))));
   }
 
   /// The kind of the node.
@@ -3355,7 +3339,7 @@ class FlutterOutline {
 /// An attribute for a FlutterOutline.
 class FlutterOutlineAttribute {
   static FlutterOutlineAttribute parse(Map m) {
-    return new FlutterOutlineAttribute(m['name'], m['label'],
+    return FlutterOutlineAttribute(m['name'], m['label'],
         literalValueBoolean: m['literalValueBoolean'],
         literalValueInteger: m['literalValueInteger'],
         literalValueString: m['literalValueString'],
@@ -3407,13 +3391,13 @@ class FlutterOutlineAttribute {
 /// A property of a Flutter widget.
 class FlutterWidgetProperty {
   static FlutterWidgetProperty parse(Map m) {
-    return new FlutterWidgetProperty(
+    return FlutterWidgetProperty(
         m['id'], m['isRequired'], m['isSafeToUpdate'], m['name'],
         documentation: m['documentation'],
         expression: m['expression'],
         children: m['children'] == null
             ? null
-            : new List.from(
+            : List.from(
                 m['children'].map((obj) => FlutterWidgetProperty.parse(obj))),
         editor: m['editor'] == null
             ? null
@@ -3477,10 +3461,10 @@ class FlutterWidgetProperty {
 /// An editor for a property of a Flutter widget.
 class FlutterWidgetPropertyEditor {
   static FlutterWidgetPropertyEditor parse(Map m) {
-    return new FlutterWidgetPropertyEditor(m['kind'],
+    return FlutterWidgetPropertyEditor(m['kind'],
         enumItems: m['enumItems'] == null
             ? null
-            : new List.from(m['enumItems']
+            : List.from(m['enumItems']
                 .map((obj) => FlutterWidgetPropertyValueEnumItem.parse(obj))));
   }
 
@@ -3494,7 +3478,7 @@ class FlutterWidgetPropertyEditor {
 /// A value of a property of a Flutter widget.
 class FlutterWidgetPropertyValue implements Jsonable {
   static FlutterWidgetPropertyValue parse(Map m) {
-    return new FlutterWidgetPropertyValue(
+    return FlutterWidgetPropertyValue(
         boolValue: m['boolValue'],
         doubleValue: m['doubleValue'],
         intValue: m['intValue'],
@@ -3540,7 +3524,7 @@ class FlutterWidgetPropertyValue implements Jsonable {
 /// static field in a class.
 class FlutterWidgetPropertyValueEnumItem {
   static FlutterWidgetPropertyValueEnumItem parse(Map m) {
-    return new FlutterWidgetPropertyValueEnumItem(
+    return FlutterWidgetPropertyValueEnumItem(
         m['libraryUri'], m['className'], m['name'],
         documentation: m['documentation']);
   }
@@ -3568,7 +3552,7 @@ class FlutterWidgetPropertyValueEnumItem {
 /// A description of a region that can be folded.
 class FoldingRegion {
   static FoldingRegion parse(Map m) {
-    return new FoldingRegion(m['kind'], m['offset'], m['length']);
+    return FoldingRegion(m['kind'], m['offset'], m['length']);
   }
 
   /// The kind of the region.
@@ -3587,7 +3571,7 @@ class FoldingRegion {
 /// with it.
 class HighlightRegion {
   static HighlightRegion parse(Map m) {
-    return new HighlightRegion(m['type'], m['offset'], m['length']);
+    return HighlightRegion(m['type'], m['offset'], m['length']);
   }
 
   /// The type of highlight associated with the region.
@@ -3605,7 +3589,7 @@ class HighlightRegion {
 /// The hover information associated with a specific location.
 class HoverInformation {
   static HoverInformation parse(Map m) {
-    return new HoverInformation(m['offset'], m['length'],
+    return HoverInformation(m['offset'], m['length'],
         containingLibraryPath: m['containingLibraryPath'],
         containingLibraryName: m['containingLibraryName'],
         containingClassDescription: m['containingClassDescription'],
@@ -3689,7 +3673,7 @@ class HoverInformation {
 /// A description of a class that is implemented or extended.
 class ImplementedClass {
   static ImplementedClass parse(Map m) {
-    return new ImplementedClass(m['offset'], m['length']);
+    return ImplementedClass(m['offset'], m['length']);
   }
 
   /// The offset of the name of the implemented class.
@@ -3704,7 +3688,7 @@ class ImplementedClass {
 /// A description of a class member that is implemented or overridden.
 class ImplementedMember {
   static ImplementedMember parse(Map m) {
-    return new ImplementedMember(m['offset'], m['length']);
+    return ImplementedMember(m['offset'], m['length']);
   }
 
   /// The offset of the name of the implemented member.
@@ -3721,8 +3705,8 @@ class ImplementedMember {
 /// `elementNames`.
 class ImportedElementSet {
   static ImportedElementSet parse(Map m) {
-    return new ImportedElementSet(new List.from(m['strings']),
-        new List.from(m['uris']), new List.from(m['names']));
+    return ImportedElementSet(
+        List.from(m['strings']), List.from(m['uris']), List.from(m['names']));
   }
 
   /// The list of unique strings in this object.
@@ -3742,8 +3726,7 @@ class ImportedElementSet {
 /// come from a single imported library.
 class ImportedElements implements Jsonable {
   static ImportedElements parse(Map m) {
-    return new ImportedElements(
-        m['path'], m['prefix'], new List.from(m['elements']));
+    return ImportedElements(m['path'], m['prefix'], List.from(m['elements']));
   }
 
   /// The absolute and normalized path of the file containing the library.
@@ -3768,7 +3751,7 @@ class ImportedElements implements Jsonable {
 /// `IncludedSuggestionSet`.
 class IncludedSuggestionRelevanceTag {
   static IncludedSuggestionRelevanceTag parse(Map m) {
-    return new IncludedSuggestionRelevanceTag(m['tag'], m['relevanceBoost']);
+    return IncludedSuggestionRelevanceTag(m['tag'], m['relevanceBoost']);
   }
 
   /// The opaque value of the tag.
@@ -3786,7 +3769,7 @@ class IncludedSuggestionRelevanceTag {
 /// which match the kind of this ref should be presented to the user.
 class IncludedSuggestionSet {
   static IncludedSuggestionSet parse(Map m) {
-    return new IncludedSuggestionSet(m['id'], m['relevance'],
+    return IncludedSuggestionSet(m['id'], m['relevance'],
         displayUri: m['displayUri']);
   }
 
@@ -3814,7 +3797,7 @@ class IncludedSuggestionSet {
 /// included for code completion when editing a file beneath that path.
 class LibraryPathSet implements Jsonable {
   static LibraryPathSet parse(Map m) {
-    return new LibraryPathSet(m['scope'], new List.from(m['libraryPaths']));
+    return LibraryPathSet(m['scope'], List.from(m['libraryPaths']));
   }
 
   /// The filepath for which this request's libraries should be active in
@@ -3846,10 +3829,10 @@ class LibraryPathSet implements Jsonable {
 /// that is not linked to others.
 class LinkedEditGroup {
   static LinkedEditGroup parse(Map m) {
-    return new LinkedEditGroup(
-        new List.from(m['positions'].map((obj) => Position.parse(obj))),
+    return LinkedEditGroup(
+        List.from(m['positions'].map((obj) => Position.parse(obj))),
         m['length'],
-        new List.from(
+        List.from(
             m['suggestions'].map((obj) => LinkedEditSuggestion.parse(obj))));
   }
 
@@ -3874,7 +3857,7 @@ class LinkedEditGroup {
 /// regions in a (LinkedEditGroup)[#type_LinkedEditGroup].
 class LinkedEditSuggestion {
   static LinkedEditSuggestion parse(Map m) {
-    return new LinkedEditSuggestion(m['value'], m['kind']);
+    return LinkedEditSuggestion(m['value'], m['kind']);
   }
 
   /// The value that could be used to replace all of the linked edit regions.
@@ -3889,7 +3872,7 @@ class LinkedEditSuggestion {
 /// A location (character range) within a file.
 class Location implements Jsonable {
   static Location parse(Map m) {
-    return new Location(
+    return Location(
         m['file'], m['offset'], m['length'], m['startLine'], m['startColumn'],
         endLine: m['endLine'], endColumn: m['endColumn']);
   }
@@ -3958,7 +3941,7 @@ class Location implements Jsonable {
 /// to display to the user.
 class MessageAction implements Jsonable {
   static MessageAction parse(Map m) {
-    return new MessageAction(m['label']);
+    return MessageAction(m['label']);
   }
 
   /// The label of the button to be displayed, and the value to be returned to
@@ -3974,8 +3957,7 @@ class MessageAction implements Jsonable {
 /// declaration of an element.
 class NavigationRegion {
   static NavigationRegion parse(Map m) {
-    return new NavigationRegion(
-        m['offset'], m['length'], new List.from(m['targets']));
+    return NavigationRegion(m['offset'], m['length'], List.from(m['targets']));
   }
 
   /// The offset of the region from which the user can navigate.
@@ -3998,8 +3980,8 @@ class NavigationRegion {
 /// A description of a target to which the user can navigate.
 class NavigationTarget {
   static NavigationTarget parse(Map m) {
-    return new NavigationTarget(m['kind'], m['fileIndex'], m['offset'],
-        m['length'], m['startLine'], m['startColumn'],
+    return NavigationTarget(m['kind'], m['fileIndex'], m['offset'], m['length'],
+        m['startLine'], m['startColumn'],
         codeOffset: m['codeOffset'], codeLength: m['codeLength']);
   }
 
@@ -4041,8 +4023,8 @@ class NavigationTarget {
 /// A description of the references to a single element within a single file.
 class Occurrences {
   static Occurrences parse(Map m) {
-    return new Occurrences(
-        Element.parse(m['element']), new List.from(m['offsets']), m['length']);
+    return Occurrences(
+        Element.parse(m['element']), List.from(m['offsets']), m['length']);
   }
 
   /// The element that was referenced.
@@ -4060,11 +4042,11 @@ class Occurrences {
 /// An node in the outline structure of a file.
 class Outline {
   static Outline parse(Map m) {
-    return new Outline(Element.parse(m['element']), m['offset'], m['length'],
+    return Outline(Element.parse(m['element']), m['offset'], m['length'],
         m['codeOffset'], m['codeLength'],
         children: m['children'] == null
             ? null
-            : new List.from(m['children'].map((obj) => Outline.parse(obj))));
+            : List.from(m['children'].map((obj) => Outline.parse(obj))));
   }
 
   /// A description of the element represented by this node.
@@ -4098,7 +4080,7 @@ class Outline {
 /// A description of a member that is being overridden.
 class OverriddenMember {
   static OverriddenMember parse(Map m) {
-    return new OverriddenMember(Element.parse(m['element']), m['className']);
+    return OverriddenMember(Element.parse(m['element']), m['className']);
   }
 
   /// The element that is being overridden.
@@ -4113,13 +4095,13 @@ class OverriddenMember {
 /// A description of a member that overrides an inherited member.
 class Override {
   static Override parse(Map m) {
-    return new Override(m['offset'], m['length'],
+    return Override(m['offset'], m['length'],
         superclassMember: m['superclassMember'] == null
             ? null
             : OverriddenMember.parse(m['superclassMember']),
         interfaceMembers: m['interfaceMembers'] == null
             ? null
-            : new List.from(m['interfaceMembers']
+            : List.from(m['interfaceMembers']
                 .map((obj) => OverriddenMember.parse(obj))));
   }
 
@@ -4147,7 +4129,7 @@ class Override {
 @experimental
 class ParameterInfo {
   static ParameterInfo parse(Map m) {
-    return new ParameterInfo(m['kind'], m['name'], m['type'],
+    return ParameterInfo(m['kind'], m['name'], m['type'],
         defaultValue: m['defaultValue']);
   }
 
@@ -4170,7 +4152,7 @@ class ParameterInfo {
 /// A position within a file.
 class Position {
   static Position parse(Map m) {
-    return new Position(m['file'], m['offset']);
+    return Position(m['file'], m['offset']);
   }
 
   /// The file containing the position.
@@ -4187,7 +4169,7 @@ class Position {
 /// The description of a postfix completion template.
 class PostfixTemplateDescriptor {
   static PostfixTemplateDescriptor parse(Map m) {
-    return new PostfixTemplateDescriptor(m['name'], m['key'], m['example']);
+    return PostfixTemplateDescriptor(m['name'], m['key'], m['example']);
   }
 
   /// The template name, shown in the UI.
@@ -4206,7 +4188,7 @@ class PostfixTemplateDescriptor {
 /// An indication of the current state of pub execution.
 class PubStatus {
   static PubStatus parse(Map m) {
-    return new PubStatus(m['isListingPackageDirs']);
+    return PubStatus(m['isListingPackageDirs']);
   }
 
   /// True if the server is currently running pub to produce a list of package
@@ -4222,7 +4204,7 @@ class PubStatus {
 /// A description of a parameter in a method refactoring.
 class RefactoringMethodParameter {
   static RefactoringMethodParameter parse(Map m) {
-    return new RefactoringMethodParameter(m['kind'], m['type'], m['name'],
+    return RefactoringMethodParameter(m['kind'], m['type'], m['name'],
         id: m['id'], parameters: m['parameters']);
   }
 
@@ -4252,7 +4234,7 @@ class RefactoringMethodParameter {
 /// A description of a problem related to a refactoring.
 class RefactoringProblem {
   static RefactoringProblem parse(Map m) {
-    return new RefactoringProblem(m['severity'], m['message'],
+    return RefactoringProblem(m['severity'], m['message'],
         location: m['location'] == null ? null : Location.parse(m['location']));
   }
 
@@ -4278,7 +4260,7 @@ class RefactoringProblem {
 /// overlay, it has no effect.
 class RemoveContentOverlay extends ContentOverlayType implements Jsonable {
   static RemoveContentOverlay parse(Map m) {
-    return new RemoveContentOverlay();
+    return RemoveContentOverlay();
   }
 
   RemoveContentOverlay() : super('remove');
@@ -4292,7 +4274,7 @@ class RemoveContentOverlay extends ContentOverlayType implements Jsonable {
 /// and get better type for 'e'.
 class RuntimeCompletionExpression implements Jsonable {
   static RuntimeCompletionExpression parse(Map m) {
-    return new RuntimeCompletionExpression(m['offset'], m['length'],
+    return RuntimeCompletionExpression(m['offset'], m['length'],
         type: m['type'] == null
             ? null
             : RuntimeCompletionExpressionType.parse(m['type']));
@@ -4318,23 +4300,23 @@ class RuntimeCompletionExpression implements Jsonable {
 /// A type at runtime.
 class RuntimeCompletionExpressionType {
   static RuntimeCompletionExpressionType parse(Map m) {
-    return new RuntimeCompletionExpressionType(m['kind'],
+    return RuntimeCompletionExpressionType(m['kind'],
         libraryPath: m['libraryPath'],
         name: m['name'],
         typeArguments: m['typeArguments'] == null
             ? null
-            : new List.from(m['typeArguments']
+            : List.from(m['typeArguments']
                 .map((obj) => RuntimeCompletionExpressionType.parse(obj))),
         returnType: m['returnType'] == null
             ? null
             : RuntimeCompletionExpressionType.parse(m['returnType']),
         parameterTypes: m['parameterTypes'] == null
             ? null
-            : new List.from(m['parameterTypes']
+            : List.from(m['parameterTypes']
                 .map((obj) => RuntimeCompletionExpressionType.parse(obj))),
         parameterNames: m['parameterNames'] == null
             ? null
-            : new List.from(m['parameterNames']));
+            : List.from(m['parameterNames']));
   }
 
   /// The kind of the type.
@@ -4379,7 +4361,7 @@ class RuntimeCompletionExpressionType {
 /// A variable in a runtime context.
 class RuntimeCompletionVariable implements Jsonable {
   static RuntimeCompletionVariable parse(Map m) {
-    return new RuntimeCompletionVariable(
+    return RuntimeCompletionVariable(
         m['name'], RuntimeCompletionExpressionType.parse(m['type']));
   }
 
@@ -4399,11 +4381,11 @@ class RuntimeCompletionVariable implements Jsonable {
 /// A single result from a search request.
 class SearchResult {
   static SearchResult parse(Map m) {
-    return new SearchResult(
+    return SearchResult(
         Location.parse(m['location']),
         m['kind'],
         m['isPotential'],
-        new List.from(m['path'].map((obj) => Element.parse(obj))));
+        List.from(m['path'].map((obj) => Element.parse(obj))));
   }
 
   /// The location of the code that matched the search criteria.
@@ -4433,7 +4415,7 @@ class SearchResult {
 @experimental
 class ServerLogEntry {
   static ServerLogEntry parse(Map m) {
-    return new ServerLogEntry(m['time'], m['kind'], m['data']);
+    return ServerLogEntry(m['time'], m['kind'], m['data']);
   }
 
   /// The time (milliseconds since epoch) at which the server created this log
@@ -4454,10 +4436,10 @@ class ServerLogEntry {
 /// A description of a set of edits that implement a single conceptual change.
 class SourceChange {
   static SourceChange parse(Map m) {
-    return new SourceChange(
+    return SourceChange(
         m['message'],
-        new List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
-        new List.from(
+        List.from(m['edits'].map((obj) => SourceFileEdit.parse(obj))),
+        List.from(
             m['linkedEditGroups'].map((obj) => LinkedEditGroup.parse(obj))),
         selection:
             m['selection'] == null ? null : Position.parse(m['selection']),
@@ -4496,8 +4478,7 @@ class SourceChange {
 /// A description of a single change to a single file.
 class SourceEdit implements Jsonable {
   static SourceEdit parse(Map m) {
-    return new SourceEdit(m['offset'], m['length'], m['replacement'],
-        id: m['id']);
+    return SourceEdit(m['offset'], m['length'], m['replacement'], id: m['id']);
   }
 
   /// The offset of the region to be modified.
@@ -4535,8 +4516,8 @@ class SourceEdit implements Jsonable {
 /// A description of a set of changes to a single file.
 class SourceFileEdit {
   static SourceFileEdit parse(Map m) {
-    return new SourceFileEdit(m['file'], m['fileStamp'],
-        new List.from(m['edits'].map((obj) => SourceEdit.parse(obj))));
+    return SourceFileEdit(m['file'], m['fileStamp'],
+        List.from(m['edits'].map((obj) => SourceEdit.parse(obj))));
   }
 
   /// The file containing the code to be modified.
@@ -4561,11 +4542,11 @@ class SourceFileEdit {
 /// A representation of a class in a type hierarchy.
 class TypeHierarchyItem {
   static TypeHierarchyItem parse(Map m) {
-    return new TypeHierarchyItem(
+    return TypeHierarchyItem(
         Element.parse(m['classElement']),
-        new List.from(m['interfaces']),
-        new List.from(m['mixins']),
-        new List.from(m['subclasses']),
+        List.from(m['interfaces']),
+        List.from(m['mixins']),
+        List.from(m['subclasses']),
         displayName: m['displayName'],
         memberElement: m['memberElement'] == null
             ? null
@@ -4777,14 +4758,14 @@ abstract class RefactoringFeedback {
 /// Feedback class for the `EXTRACT_LOCAL_VARIABLE` refactoring.
 class ExtractLocalVariableFeedback extends RefactoringFeedback {
   static ExtractLocalVariableFeedback parse(Map m) =>
-      new ExtractLocalVariableFeedback(new List.from(m['names']),
-          new List.from(m['offsets']), new List.from(m['lengths']),
+      ExtractLocalVariableFeedback(List.from(m['names']),
+          List.from(m['offsets']), List.from(m['lengths']),
           coveringExpressionOffsets: m['coveringExpressionOffsets'] == null
               ? null
-              : new List.from(m['coveringExpressionOffsets']),
+              : List.from(m['coveringExpressionOffsets']),
           coveringExpressionLengths: m['coveringExpressionLengths'] == null
               ? null
-              : new List.from(m['coveringExpressionLengths']));
+              : List.from(m['coveringExpressionLengths']));
 
   /// The proposed names for the local variable.
   final List<String> names;
@@ -4813,16 +4794,16 @@ class ExtractLocalVariableFeedback extends RefactoringFeedback {
 
 /// Feedback class for the `EXTRACT_METHOD` refactoring.
 class ExtractMethodFeedback extends RefactoringFeedback {
-  static ExtractMethodFeedback parse(Map m) => new ExtractMethodFeedback(
+  static ExtractMethodFeedback parse(Map m) => ExtractMethodFeedback(
       m['offset'],
       m['length'],
       m['returnType'],
-      new List.from(m['names']),
+      List.from(m['names']),
       m['canCreateGetter'],
-      new List.from(
+      List.from(
           m['parameters'].map((obj) => RefactoringMethodParameter.parse(obj))),
-      new List.from(m['offsets']),
-      new List.from(m['lengths']));
+      List.from(m['offsets']),
+      List.from(m['lengths']));
 
   /// The offset to the beginning of the expression or statements that will be
   /// extracted.
@@ -4862,7 +4843,7 @@ class ExtractMethodFeedback extends RefactoringFeedback {
 /// Feedback class for the `INLINE_LOCAL_VARIABLE` refactoring.
 class InlineLocalVariableFeedback extends RefactoringFeedback {
   static InlineLocalVariableFeedback parse(Map m) =>
-      new InlineLocalVariableFeedback(m['name'], m['occurrences']);
+      InlineLocalVariableFeedback(m['name'], m['occurrences']);
 
   /// The name of the variable being inlined.
   final String name;
@@ -4876,7 +4857,7 @@ class InlineLocalVariableFeedback extends RefactoringFeedback {
 /// Feedback class for the `INLINE_METHOD` refactoring.
 class InlineMethodFeedback extends RefactoringFeedback {
   static InlineMethodFeedback parse(Map m) =>
-      new InlineMethodFeedback(m['methodName'], m['isDeclaration'],
+      InlineMethodFeedback(m['methodName'], m['isDeclaration'],
           className: m['className']);
 
   /// The name of the method (or function) being inlined.
@@ -4895,7 +4876,7 @@ class InlineMethodFeedback extends RefactoringFeedback {
 
 /// Feedback class for the `RENAME` refactoring.
 class RenameFeedback extends RefactoringFeedback {
-  static RenameFeedback parse(Map m) => new RenameFeedback(
+  static RenameFeedback parse(Map m) => RenameFeedback(
       m['offset'], m['length'], m['elementKindName'], m['oldName']);
 
   /// The offset to the beginning of the name selected to be renamed, or -1 if

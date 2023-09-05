@@ -10,7 +10,7 @@ import 'package:path/path.dart' as path;
 
 class ServerHelper {
   static Future<ServerHelper> create() async {
-    return new ServerHelper(await AnalysisServer.create());
+    return ServerHelper(await AnalysisServer.create());
   }
 
   final AnalysisServer server;
@@ -42,7 +42,7 @@ class ServerHelper {
   Future<String> createFile(String filePath, String text) {
     String fullPath = path.join(tempDir.path, filePath);
     return server.analysis.updateContent(
-      {fullPath: new AddContentOverlay(text)},
+      {fullPath: AddContentOverlay(text)},
     ).then((_) => fullPath);
   }
 
