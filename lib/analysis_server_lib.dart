@@ -255,6 +255,7 @@ abstract class Domain {
     }
   }
 
+  @override
   String toString() => 'Domain ${name}';
 }
 
@@ -283,6 +284,7 @@ class RequestError {
 
   RequestError(this.method, this.code, this.message, {this.stackTrace});
 
+  @override
   String toString() =>
       '[Analyzer RequestError method: ${method}, code: ${code}, message: ${message}]';
 }
@@ -2460,6 +2462,7 @@ class AddContentOverlay extends ContentOverlayType implements Jsonable {
 
   AddContentOverlay(this.content) : super('add');
 
+  @override
   Map toMap() => _stripNullValues({'type': type, 'content': content});
 }
 
@@ -2520,6 +2523,7 @@ class AnalysisError {
       this.severity, this.type, this.location, this.message, this.code,
       {this.correction, this.url, this.contextMessages, this.hasFix});
 
+  @override
   bool operator ==(o) =>
       o is AnalysisError &&
       severity == o.severity &&
@@ -2532,6 +2536,7 @@ class AnalysisError {
       contextMessages == o.contextMessages &&
       hasFix == o.hasFix;
 
+  @override
   int get hashCode =>
       severity.hashCode ^
       type.hashCode ^
@@ -2539,6 +2544,7 @@ class AnalysisError {
       message.hashCode ^
       code.hashCode;
 
+  @override
   String toString() =>
       '[AnalysisError severity: ${severity}, type: ${type}, location: ${location}, message: ${message}, code: ${code}]';
 }
@@ -2619,6 +2625,7 @@ class AnalysisOptions implements Jsonable {
       this.generateHints,
       this.generateLints});
 
+  @override
   Map toMap() => _stripNullValues({
         'enableAsync': enableAsync,
         'enableDeferredLoading': enableDeferredLoading,
@@ -2646,6 +2653,7 @@ class AnalysisStatus {
 
   AnalysisStatus(this.isAnalyzing, {this.analysisTarget});
 
+  @override
   String toString() => '[AnalysisStatus isAnalyzing: ${isAnalyzing}]';
 }
 
@@ -2792,6 +2800,7 @@ class ChangeContentOverlay extends ContentOverlayType implements Jsonable {
 
   ChangeContentOverlay(this.edits) : super('change');
 
+  @override
   Map toMap() => _stripNullValues({'type': type, 'edits': edits});
 }
 
@@ -3007,6 +3016,7 @@ class CompletionSuggestion implements Jsonable {
       this.libraryUri,
       this.isNotImported});
 
+  @override
   Map toMap() => _stripNullValues({
         'kind': kind,
         'relevance': relevance,
@@ -3035,6 +3045,7 @@ class CompletionSuggestion implements Jsonable {
         'isNotImported': isNotImported
       });
 
+  @override
   String toString() =>
       '[CompletionSuggestion kind: ${kind}, relevance: ${relevance}, completion: ${completion}, selectionOffset: ${selectionOffset}, selectionLength: ${selectionLength}, isDeprecated: ${isDeprecated}, isPotential: ${isPotential}]';
 }
@@ -3139,6 +3150,7 @@ class Element implements Jsonable {
       this.typeParameters,
       this.aliasedType});
 
+  @override
   Map toMap() => _stripNullValues({
         'kind': kind,
         'name': name,
@@ -3150,6 +3162,7 @@ class Element implements Jsonable {
         'aliasedType': aliasedType
       });
 
+  @override
   String toString() =>
       '[Element kind: ${kind}, name: ${name}, flags: ${flags}]';
 }
@@ -3510,6 +3523,7 @@ class FlutterWidgetPropertyValue implements Jsonable {
       this.enumValue,
       this.expression});
 
+  @override
   Map toMap() => _stripNullValues({
         'boolValue': boolValue,
         'doubleValue': doubleValue,
@@ -3741,6 +3755,7 @@ class ImportedElements implements Jsonable {
 
   ImportedElements(this.path, this.prefix, this.elements);
 
+  @override
   Map toMap() =>
       _stripNullValues({'path': path, 'prefix': prefix, 'elements': elements});
 }
@@ -3811,6 +3826,7 @@ class LibraryPathSet implements Jsonable {
 
   LibraryPathSet(this.scope, this.libraryPaths);
 
+  @override
   Map toMap() =>
       _stripNullValues({'scope': scope, 'libraryPaths': libraryPaths});
 }
@@ -3849,6 +3865,7 @@ class LinkedEditGroup {
 
   LinkedEditGroup(this.positions, this.length, this.suggestions);
 
+  @override
   String toString() =>
       '[LinkedEditGroup positions: ${positions}, length: ${length}, suggestions: ${suggestions}]';
 }
@@ -3906,6 +3923,7 @@ class Location implements Jsonable {
       this.file, this.offset, this.length, this.startLine, this.startColumn,
       {this.endLine, this.endColumn});
 
+  @override
   Map toMap() => _stripNullValues({
         'file': file,
         'offset': offset,
@@ -3916,6 +3934,7 @@ class Location implements Jsonable {
         'endColumn': endColumn
       });
 
+  @override
   bool operator ==(o) =>
       o is Location &&
       file == o.file &&
@@ -3926,6 +3945,7 @@ class Location implements Jsonable {
       endLine == o.endLine &&
       endColumn == o.endColumn;
 
+  @override
   int get hashCode =>
       file.hashCode ^
       offset.hashCode ^
@@ -3933,6 +3953,7 @@ class Location implements Jsonable {
       startLine.hashCode ^
       startColumn.hashCode;
 
+  @override
   String toString() =>
       '[Location file: ${file}, offset: ${offset}, length: ${length}, startLine: ${startLine}, startColumn: ${startColumn}]';
 }
@@ -3950,6 +3971,7 @@ class MessageAction implements Jsonable {
 
   MessageAction(this.label);
 
+  @override
   Map toMap() => _stripNullValues({'label': label});
 }
 
@@ -3973,6 +3995,7 @@ class NavigationRegion {
 
   NavigationRegion(this.offset, this.length, this.targets);
 
+  @override
   String toString() =>
       '[NavigationRegion offset: ${offset}, length: ${length}, targets: ${targets}]';
 }
@@ -4016,6 +4039,7 @@ class NavigationTarget {
       this.startLine, this.startColumn,
       {this.codeOffset, this.codeLength});
 
+  @override
   String toString() =>
       '[NavigationTarget kind: ${kind}, fileIndex: ${fileIndex}, offset: ${offset}, length: ${length}, startLine: ${startLine}, startColumn: ${startColumn}]';
 }
@@ -4163,6 +4187,7 @@ class Position {
 
   Position(this.file, this.offset);
 
+  @override
   String toString() => '[Position file: ${file}, offset: ${offset}]';
 }
 
@@ -4197,6 +4222,7 @@ class PubStatus {
 
   PubStatus(this.isListingPackageDirs);
 
+  @override
   String toString() =>
       '[PubStatus isListingPackageDirs: ${isListingPackageDirs}]';
 }
@@ -4265,6 +4291,7 @@ class RemoveContentOverlay extends ContentOverlayType implements Jsonable {
 
   RemoveContentOverlay() : super('remove');
 
+  @override
   Map toMap() => _stripNullValues({'type': type});
 }
 
@@ -4293,6 +4320,7 @@ class RuntimeCompletionExpression implements Jsonable {
 
   RuntimeCompletionExpression(this.offset, this.length, {this.type});
 
+  @override
   Map toMap() =>
       _stripNullValues({'offset': offset, 'length': length, 'type': type});
 }
@@ -4375,6 +4403,7 @@ class RuntimeCompletionVariable implements Jsonable {
 
   RuntimeCompletionVariable(this.name, this.type);
 
+  @override
   Map toMap() => _stripNullValues({'name': name, 'type': type});
 }
 
@@ -4407,6 +4436,7 @@ class SearchResult {
 
   SearchResult(this.location, this.kind, this.isPotential, this.path);
 
+  @override
   String toString() =>
       '[SearchResult location: ${location}, kind: ${kind}, isPotential: ${isPotential}, path: ${path}]';
 }
@@ -4471,6 +4501,7 @@ class SourceChange {
   SourceChange(this.message, this.edits, this.linkedEditGroups,
       {this.selection, this.selectionLength, this.id});
 
+  @override
   String toString() =>
       '[SourceChange message: ${message}, edits: ${edits}, linkedEditGroups: ${linkedEditGroups}]';
 }
@@ -4502,6 +4533,7 @@ class SourceEdit implements Jsonable {
 
   SourceEdit(this.offset, this.length, this.replacement, {this.id});
 
+  @override
   Map toMap() => _stripNullValues({
         'offset': offset,
         'length': length,
@@ -4509,6 +4541,7 @@ class SourceEdit implements Jsonable {
         'id': id
       });
 
+  @override
   String toString() =>
       '[SourceEdit offset: ${offset}, length: ${length}, replacement: ${replacement}]';
 }
@@ -4536,6 +4569,7 @@ class SourceFileEdit {
 
   SourceFileEdit(this.file, this.fileStamp, this.edits);
 
+  @override
   String toString() => '[SourceFileEdit file: ${file}, edits: ${edits}]';
 }
 
@@ -4622,6 +4656,7 @@ class ExtractLocalVariableRefactoringOptions extends RefactoringOptions {
 
   ExtractLocalVariableRefactoringOptions({this.name, this.extractAll});
 
+  @override
   Map toMap() => _stripNullValues({'name': name, 'extractAll': extractAll});
 }
 
@@ -4661,6 +4696,7 @@ class ExtractMethodRefactoringOptions extends RefactoringOptions {
       this.parameters,
       this.extractAll});
 
+  @override
   Map toMap() => _stripNullValues({
         'returnType': returnType,
         'createGetter': createGetter,
@@ -4679,6 +4715,7 @@ class ExtractWidgetRefactoringOptions extends RefactoringOptions {
 
   ExtractWidgetRefactoringOptions({this.name});
 
+  @override
   Map toMap() => _stripNullValues({'name': name});
 }
 
@@ -4697,6 +4734,7 @@ class InlineMethodRefactoringOptions extends RefactoringOptions {
 
   InlineMethodRefactoringOptions({this.deleteSource, this.inlineAll});
 
+  @override
   Map toMap() =>
       _stripNullValues({'deleteSource': deleteSource, 'inlineAll': inlineAll});
 }
@@ -4719,6 +4757,7 @@ class MoveFileRefactoringOptions extends RefactoringOptions {
 
   MoveFileRefactoringOptions({this.newFile});
 
+  @override
   Map toMap() => _stripNullValues({'newFile': newFile});
 }
 
@@ -4733,6 +4772,7 @@ class RenameRefactoringOptions extends RefactoringOptions {
 
   RenameRefactoringOptions({this.newName});
 
+  @override
   Map toMap() => _stripNullValues({'newName': newName});
 }
 
