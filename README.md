@@ -15,7 +15,7 @@ changing.
 
 Clients (typically tools, such as an editor) are expected to run the analysis server in a separate
 process and communicate with it over a JSON protocol. The protocol is specified
-[here](https://htmlpreview.github.io/?https://github.com/dart-lang/sdk/blob/master/pkg/analysis_server/doc/api.html).
+[here](https://htmlpreview.github.io/?https://github.com/dart-lang/sdk/blob/main/pkg/analysis_server/doc/api.html).
 
 Here's a simple example of starting and communicating with the server:
 

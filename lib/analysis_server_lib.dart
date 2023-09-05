@@ -23,7 +23,7 @@ const String experimental = 'experimental';
 
 final Logger _logger = new Logger('analysis_server');
 
-const String generatedProtocolVersion = '1.33.4';
+const String generatedProtocolVersion = '1.34.0';
 
 typedef MethodSend = void Function(String methodName);
 
@@ -367,6 +367,45 @@ class ServerDomain extends Domain {
   /// may be incomplete or inaccurate. This request always completes without
   /// error regardless of whether the request is successfully cancelled.
   Future cancelRequest(String id) => _call('server.cancelRequest', {'id': id});
+
+  /// Record the capabilities supported by the client. The default values,
+  /// documented below, will be assumed until this request is received.
+  Future setClientCapabilities(List<String> requests) =>
+      _call('server.setClientCapabilities', {'requests': requests});
+
+  /// **Note:** This is a request from the server to the client.
+  ///
+  /// Request that a URL be opened.
+  ///
+  /// The client is expected to open the URL, either within the client's UI or
+  /// in the default browser.
+  ///
+  /// The request will only be sent from the server to the client if the client
+  /// has indicated that it supports this request by using the
+  /// `setClientCapabilities` request.
+  Future openUrlRequest(String url) =>
+      _call('server.openUrlRequest', {'url': url});
+
+  /// **Note:** This is a request from the server to the client.
+  ///
+  /// Request that a message be displayed to the user.
+  ///
+  /// The client is expected to display the message to the user with one or more
+  /// buttons with the specified labels, and to return a response consisting of
+  /// the label of the button that was clicked.
+  ///
+  /// The request will only be sent from the server to the client if the client
+  /// has indicated that it supports this request by using the
+  /// `setClientCapabilities` request.
+  ///
+  /// This request is modeled after the ( same request from the LSP
+  /// specification)[https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest].
+  Future<ShowMessageRequestResult> showMessageRequest(
+      String? type, String? message, List<MessageAction>? actions) {
+    final Map m = {'type': type, 'message': message, 'actions': actions};
+    return _call('server.showMessageRequest', m)
+        .then(ShowMessageRequestResult.parse);
+  }
 }
 
 class ServerConnected {
@@ -431,6 +470,18 @@ class VersionResult {
   final String version;
 
   VersionResult(this.version);
+}
+
+class ShowMessageRequestResult {
+  static ShowMessageRequestResult parse(Map m) =>
+      new ShowMessageRequestResult(action: m['action']);
+
+  /// The label of the action that was selected by the user. May be omitted or
+  /// `null` if the user dismissed the message without clicking an action
+  /// button.
+  final String? action;
+
+  ShowMessageRequestResult({this.action});
 }
 
 // analysis domain
@@ -1248,7 +1299,7 @@ class CompletionResults {
 
   /// The client is expected to check this list against the `ElementKind` sent
   /// in `IncludedSuggestionSet` to decide whether or not these symbols should
-  /// should be presented to the user.
+  /// be presented to the user.
   final List<String>? includedElementKinds;
 
   /// The client is expected to check this list against the values of the field
@@ -2526,7 +2577,6 @@ class AnalysisOptions implements Jsonable {
         enableDeferredLoading: m['enableDeferredLoading'],
         enableEnums: m['enableEnums'],
         enableNullAwareOperators: m['enableNullAwareOperators'],
-        enableSuperMixins: m['enableSuperMixins'],
         generateDart2jsHints: m['generateDart2jsHints'],
         generateHints: m['generateHints'],
         generateLints: m['generateLints']);
@@ -2558,10 +2608,6 @@ class AnalysisOptions implements Jsonable {
   @deprecated
   final bool? enableNullAwareOperators;
 
-  /// True if the client wants to enable support for the proposed "less
-  /// restricted mixins" proposal (DEP 34).
-  final bool? enableSuperMixins;
-
   /// True if hints that are specific to dart2js should be generated. This
   /// option is ignored if generateHints is false.
   final bool? generateDart2jsHints;
@@ -2579,7 +2625,6 @@ class AnalysisOptions implements Jsonable {
       this.enableDeferredLoading,
       this.enableEnums,
       this.enableNullAwareOperators,
-      this.enableSuperMixins,
       this.generateDart2jsHints,
       this.generateHints,
       this.generateLints});
@@ -2589,7 +2634,6 @@ class AnalysisOptions implements Jsonable {
         'enableDeferredLoading': enableDeferredLoading,
         'enableEnums': enableEnums,
         'enableNullAwareOperators': enableNullAwareOperators,
-        'enableSuperMixins': enableSuperMixins,
         'generateDart2jsHints': generateDart2jsHints,
         'generateHints': generateHints,
         'generateLints': generateLints
@@ -3910,6 +3954,22 @@ class Location implements Jsonable {
       '[Location file: ${file}, offset: ${offset}, length: ${length}, startLine: ${startLine}, startColumn: ${startColumn}]';
 }
 
+/// An action associated with a message that the server is requesting the client
+/// to display to the user.
+class MessageAction implements Jsonable {
+  static MessageAction parse(Map m) {
+    return new MessageAction(m['label']);
+  }
+
+  /// The label of the button to be displayed, and the value to be returned to
+  /// the server if the button is clicked.
+  final String label;
+
+  MessageAction(this.label);
+
+  Map toMap() => _stripNullValues({'label': label});
+}
+
 /// A description of a region from which the user can navigate to the
 /// declaration of an element.
 class NavigationRegion {
@@ -4521,7 +4581,7 @@ class TypeHierarchyItem {
   final List<int> interfaces;
 
   /// The indexes of the items representing the mixins referenced by this class.
-  /// The list will be empty if there are no classes mixed in to this class.
+  /// The list will be empty if there are no classes mixed into this class.
   final List<int> mixins;
 
   /// The indexes of the items representing the subtypes of this class. The list
